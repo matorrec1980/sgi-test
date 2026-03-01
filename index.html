@@ -1,89 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SGI Debug</title>
+  <meta charset="UTF-8" />
+  <title>SGI Security Test</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>Session Debug</h2>
+  <h2>SGI Security Test</h2>
 
-<input type="email" id="email" placeholder="Email">
-<input type="password" id="password" placeholder="Password">
-<button onclick="login()">Login</button>
-<button onclick="logout()">Logout</button>
+  <input type="email" id="email" placeholder="Email" />
+  <input type="password" id="password" placeholder="Password" />
+  <button onclick="login()">Login</button>
+  <button onclick="logout()">Logout</button>
+  <button onclick="checkSession()">Check Session</button>
+  <button onclick="testUpdate()">Test Update</button>
 
-<br><br>
-<button onclick="checkSession()">Check Session</button>
-<button onclick="testUpdate()">Test Update</button>
-
-<p id="result"></p>
+  <pre id="result"></pre>
 
 <script>
-  const SUPABASE_URL = "https://rnoprngmmqvrzfygyppg.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
+const SUPABASE_URL = "https://rnoprngmmqvrzfygyppg.supabase.co";
+const SUPABASE_KEY = "sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
 
-  const { createClient } = supabase;
-  const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+const { createClient } = supabase;
+const client = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  async function login() {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+async function login() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
-    const { data, error } = await client.auth.signInWithPassword({
-      email,
-      password
-    });
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password
+  });
 
-    if (error) {
-      document.getElementById("result").innerText = error.message;
-      return;
-    }
-
+  if (error) {
     document.getElementById("result").innerText =
-      "Logged in as: " + data.user.email + " | ID: " + data.user.id;
+      "LOGIN ERROR: " + error.message;
+    return;
   }
 
-  async function logout() {
-    await client.auth.signOut();
-    document.getElementById("result").innerText = "Logged out";
-  }
+  document.getElementById("result").innerText =
+    "LOGIN SUCCESS: " + data.user.email;
+}
 
-  async function checkSession() {
-    const { data } = await client.auth.getSession();
+async function logout() {
+  await client.auth.signOut();
+  document.getElementById("result").innerText = "LOGGED OUT";
+}
 
-    if (!data.session) {
-      document.getElementById("result").innerText = "NO ACTIVE SESSION";
-      return;
-    }
+async function checkSession() {
+  const { data } = await client.auth.getSession();
 
+  if (!data.session) {
     document.getElementById("result").innerText =
-      "SESSION ACTIVE | Email: " + data.session.user.email +
-      " | ID: " + data.session.user.id;
+      "NO ACTIVE SESSION";
+    return;
   }
 
-  async function testUpdate() {
-    const { data: sessionData } = await client.auth.getSession();
+  document.getElementById("result").innerText =
+    "SESSION ACTIVE\n" +
+    "Email: " + data.session.user.email + "\n" +
+    "User ID: " + data.session.user.id;
+}
 
-    if (!sessionData.session) {
-      document.getElementById("result").innerText = "NO SESSION - UPDATE SHOULD FAIL";
-      return;
-    }
+async function testUpdate() {
 
-    const { error } = await client
-      .from("invoices_px")
-      .update({ invoice_number: "FAC-DEBUG" })
-      .eq("invoice_number", "FAC-001");
+  const { error, data } = await client
+    .from("invoices_px")
+    .update({ invoice_number: "FAC-DEBUG" })
+    .eq("invoice_number", "FAC-001");
 
-    if (error) {
-      document.getElementById("result").innerText = "BLOCKED: " + error.message;
-      return;
-    }
-
-    document.getElementById("result").innerText = "UPDATE SUCCESS";
+  if (error) {
+    document.getElementById("result").innerText =
+      "BLOCKED: " + error.message;
+    return;
   }
+
+  document.getElementById("result").innerText =
+    "UPDATE SUCCESS\nAffected rows: " + (data ? data.length : 0);
+}
 </script>
 
 </body>
-
 </html>
