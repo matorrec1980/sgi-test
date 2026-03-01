@@ -73,7 +73,7 @@
     const { error } = await client
       .from("invoices_px")
       .update({ invoice_number: "FAC-DEBUG" })
-      .eq("invoice_number", "FAC-TEST");
+      .eq("invoice_number", "FAC-001");
 
     if (error) {
       document.getElementById("result").innerText = "BLOCKED: " + error.message;
@@ -85,4 +85,5 @@
 </script>
 
 </body>
+
 </html>
