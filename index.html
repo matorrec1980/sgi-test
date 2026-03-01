@@ -1,316 +1,169 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>SGI - Sistema de Gestión de Importaciones</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8">
+<title>SGI - Sistema de Gestión de Importaciones</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #F5F6F8;
-    }
-
-    .login-container {
-      display: flex;
-      height: 100vh;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .login-box {
-      background: white;
-      padding: 40px;
-      border-radius: 8px;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-      width: 320px;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 15px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-    }
-
-    button {
-      padding: 8px 12px;
-      background-color: #1D4ED8;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      background-color: #9CA3AF;
-      cursor: not-allowed;
-    }
-
-    button:hover:not(:disabled) {
-      background-color: #1E40AF;
-    }
-
-    .layout {
-      display: none;
-      height: 100vh;
-    }
-
-    .sidebar {
-      width: 240px;
-      background-color: #1F2937;
-      color: white;
-      padding: 20px;
-    }
-
-    .sidebar div {
-      margin: 15px 0;
-      cursor: pointer;
-    }
-
-    .sidebar div:hover {
-      color: #60A5FA;
-    }
-
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .header {
-      background: white;
-      padding: 15px 25px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #e5e7eb;
-    }
-
-    .content {
-      padding: 25px;
-      overflow-y: auto;
-    }
-
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 6px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-      margin-bottom: 20px;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-    }
-
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid #e5e7eb;
-      text-align: left;
-    }
-
-  </style>
+<style>
+body { margin:0; font-family:Arial; background:#F5F6F8; }
+.layout { display:none; height:100vh; }
+.sidebar { width:240px; background:#1F2937; color:white; padding:20px; }
+.sidebar div { margin:15px 0; cursor:pointer; }
+.sidebar div:hover { color:#60A5FA; }
+.main { flex:1; display:flex; flex-direction:column; }
+.header { background:white; padding:15px 25px; display:flex; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
+.content { padding:25px; overflow:auto; }
+.card { background:white; padding:20px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
+button { padding:8px 12px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; }
+button:disabled { background:#9CA3AF; }
+input { padding:8px; margin-bottom:10px; width:100%; }
+.login-container { display:flex; height:100vh; align-items:center; justify-content:center; }
+.login-box { background:white; padding:40px; border-radius:8px; box-shadow:0 5px 20px rgba(0,0,0,0.1); width:320px; }
+</style>
 </head>
+
 <body>
 
 <div class="login-container" id="loginContainer">
-  <div class="login-box">
-    <h2>SGI</h2>
-    <input type="email" id="email" placeholder="Correo">
-    <input type="password" id="password" placeholder="Contraseña">
-    <button onclick="login()" style="width:100%;">Ingresar</button>
-    <p id="loginMessage" style="color:red; text-align:center;"></p>
-  </div>
+<div class="login-box">
+<h2>SGI</h2>
+<input type="email" id="email" placeholder="Correo">
+<input type="password" id="password" placeholder="Contraseña">
+<button onclick="login()" style="width:100%">Ingresar</button>
+<p id="loginMessage" style="color:red;text-align:center;"></p>
+</div>
 </div>
 
 <div class="layout" id="appLayout">
 
-  <div class="sidebar">
-    <h3>SGI</h3>
-    <div onclick="loadDashboard()">Dashboard</div>
-    <div onclick="loadFacturas()">Facturas PX</div>
-    <div onclick="logout()">Cerrar Sesión</div>
-  </div>
+<div class="sidebar">
+<h3>SGI</h3>
+<div onclick="loadDashboard()">Dashboard</div>
+<div onclick="loadFacturas()">Facturas PX</div>
+<div onclick="loadImportGeneral()">Registro General</div>
+<div onclick="logout()">Cerrar Sesión</div>
+</div>
 
-  <div class="main">
-    <div class="header">
-      <div id="userInfo"></div>
-      <div id="periodStatus"></div>
-    </div>
-    <div class="content" id="contentArea"></div>
-  </div>
+<div class="main">
+<div class="header">
+<div id="userInfo"></div>
+<div id="periodStatus"></div>
+</div>
+<div class="content" id="contentArea"></div>
+</div>
 
 </div>
 
 <script>
 
-const SUPABASE_URL = "https://rnoprngmmqvrzfygyppg.supabase.co";
-const SUPABASE_KEY = "sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL="https://rnoprngmmqvrzfygyppg.supabase.co";
+const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
+const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
-let currentPeriodStatus = null;
+let currentPeriodStatus=null;
 
-async function login() {
-
-  const { data, error } = await client.auth.signInWithPassword({
-    email: document.getElementById("email").value,
-    password: document.getElementById("password").value
-  });
-
-  if (error) {
-    document.getElementById("loginMessage").innerText = error.message;
-    return;
-  }
-
-  loadApp();
+async function login(){
+const {data,error}=await client.auth.signInWithPassword({
+email:email.value,password:password.value});
+if(error){loginMessage.innerText=error.message;return;}
+loadApp();
 }
 
-async function logout() {
-  await client.auth.signOut();
-  location.reload();
+async function logout(){await client.auth.signOut();location.reload();}
+
+async function loadApp(){
+const {data}=await client.auth.getSession();
+if(!data.session)return;
+loginContainer.style.display="none";
+appLayout.style.display="flex";
+const role=await client.rpc("current_user_role");
+userInfo.innerText=data.session.user.email+" | Rol: "+role.data;
+await loadCurrentPeriod();
+loadDashboard();
 }
 
-async function loadApp() {
-
-  const { data: sessionData } = await client.auth.getSession();
-  if (!sessionData.session) return;
-
-  document.getElementById("loginContainer").style.display = "none";
-  document.getElementById("appLayout").style.display = "flex";
-
-  const userEmail = sessionData.session.user.email;
-  const { data: role } = await client.rpc("current_user_role");
-
-  document.getElementById("userInfo").innerText =
-    userEmail + " | Rol: " + role;
-
-  await loadCurrentPeriod();
-  loadDashboard();
+async function loadCurrentPeriod(){
+const {data}=await client.from("periods")
+.select("id,year,month,status")
+.order("created_at",{ascending:false}).limit(1);
+if(!data)return;
+currentPeriodStatus=data[0].status;
+const color=currentPeriodStatus==="ABIERTO"?"#16A34A":"#DC2626";
+periodStatus.innerHTML="Período: "+data[0].year+"-"+data[0].month+
+" | Estado: <span style='color:"+color+"'>"+currentPeriodStatus+"</span>";
 }
 
-async function loadCurrentPeriod() {
-
-  const { data } = await client
-    .from("periods")
-    .select("id, year, month, status")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (!data || data.length === 0) return;
-
-  const period = data[0];
-  currentPeriodStatus = period.status;
-
-  const statusColor = period.status === "ABIERTO" ? "#16A34A" : "#DC2626";
-
-  document.getElementById("periodStatus").innerHTML =
-    "Período: " + period.year + "-" + period.month +
-    " | Estado: <span style='color:" + statusColor + "'>" + period.status + "</span>";
+function loadDashboard(){
+contentArea.innerHTML=`<div class="card"><h3>Dashboard SGI</h3></div>`;
 }
 
-function loadDashboard() {
-
-  let warningBlock = "";
-
-  if (currentPeriodStatus === "CERRADO") {
-    warningBlock = `
-      <div class="card" style="border-left:5px solid #DC2626;">
-        <h3 style="color:#DC2626;">Período Cerrado</h3>
-        <p>No se permiten modificaciones.</p>
-      </div>
-    `;
-  }
-
-  document.getElementById("contentArea").innerHTML = `
-    ${warningBlock}
-    <div class="card">
-      <h3>Bienvenido al SGI</h3>
-      <p>Seleccione un módulo del menú.</p>
-    </div>
-  `;
+async function loadFacturas(){
+const {data}=await client.from("invoices_px")
+.select("invoice_number,total_amount,status");
+let rows="";
+data.forEach(f=>{
+rows+=`<tr><td>${f.invoice_number}</td>
+<td>${f.total_amount}</td>
+<td>${f.status}</td></tr>`;
+});
+contentArea.innerHTML=`<div class="card">
+<h3>Facturas PX</h3>
+<table border="1" width="100%">
+<tr><th>Número</th><th>Total</th><th>Estado</th></tr>
+${rows}</table></div>`;
 }
 
-async function loadFacturas() {
+async function loadImportGeneral(){
 
-  const { data, error } = await client
-    .from("invoices_px")
-    .select("id, invoice_number, total_amount, status");
+const {data,error}=await client.from("import_general")
+.select("id,total_px,total_gdn,total_import");
 
-  if (error) {
-    document.getElementById("contentArea").innerHTML =
-      "<div class='card'>Error cargando facturas</div>";
-    return;
-  }
+if(error){contentArea.innerHTML="<div class='card'>Error</div>";return;}
 
-  let rows = "";
+let rows="";
 
-  data.forEach(f => {
+data.forEach(r=>{
+const disabled=currentPeriodStatus==="CERRADO"?"disabled":"";
+rows+=`<tr>
+<td>${r.total_px}</td>
+<td>${r.total_gdn}</td>
+<td>${r.total_import}</td>
+<td><button ${disabled} onclick="editImport('${r.id}',${r.total_px},${r.total_gdn})">Editar</button></td>
+</tr>`;
+});
 
-    const disabled = currentPeriodStatus === "CERRADO" ? "disabled" : "";
-
-    rows += `
-      <tr>
-        <td>${f.invoice_number}</td>
-        <td>${f.total_amount}</td>
-        <td>${f.status}</td>
-        <td>
-          <button ${disabled} onclick="editFactura('${f.id}')">
-            Editar
-          </button>
-        </td>
-      </tr>
-    `;
-  });
-
-  document.getElementById("contentArea").innerHTML = `
-    <div class="card">
-      <h3>Facturas PX</h3>
-      <table>
-        <tr>
-          <th>Número</th>
-          <th>Total</th>
-          <th>Estado</th>
-          <th>Acción</th>
-        </tr>
-        ${rows}
-      </table>
-    </div>
-  `;
+contentArea.innerHTML=`<div class="card">
+<h3>Registro General Importación</h3>
+<table border="1" width="100%">
+<tr><th>Total PX</th><th>Total GDN</th><th>Total Importación</th><th>Acción</th></tr>
+${rows}</table></div>`;
 }
 
-async function editFactura(id) {
+async function editImport(id,px,gdn){
 
-  if (currentPeriodStatus === "CERRADO") {
-    alert("Período cerrado.");
-    return;
-  }
+if(currentPeriodStatus==="CERRADO"){
+alert("Período cerrado.");
+return;
+}
 
-  const nuevoValor = prompt("Nuevo total:");
+const nuevoGDN=prompt("Nuevo Total GDN:",gdn);
+if(!nuevoGDN)return;
 
-  if (!nuevoValor) return;
+const nuevoTotal=Number(px)+Number(nuevoGDN);
 
-  const { data, error } = await client
-    .from("invoices_px")
-    .update({ total_amount: Number(nuevoValor) })
-    .eq("id", id)
-    .select();
+const {data,error}=await client.from("import_general")
+.update({total_gdn:Number(nuevoGDN),total_import:nuevoTotal})
+.eq("id",id).select();
 
-  if (error || data.length === 0) {
-    alert("Operación no permitida.");
-    return;
-  }
+if(error||data.length===0){alert("Bloqueado por RLS");return;}
 
-  alert("Actualizado correctamente.");
-  loadFacturas();
+alert("Actualizado correctamente.");
+loadImportGeneral();
 }
 
 loadApp();
 
 </script>
-
 </body>
 </html>
