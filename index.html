@@ -20,6 +20,8 @@ button:disabled { background:#9CA3AF; }
 input { padding:8px; margin-bottom:10px; width:100%; }
 .login-container { display:flex; height:100vh; align-items:center; justify-content:center; }
 .login-box { background:white; padding:40px; border-radius:8px; box-shadow:0 5px 20px rgba(0,0,0,0.1); width:320px; }
+table { border-collapse:collapse; width:100%; }
+th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; }
 </style>
 </head>
 
@@ -40,6 +42,7 @@ input { padding:8px; margin-bottom:10px; width:100%; }
 <div class="sidebar">
 <h3>SGI</h3>
 <div onclick="loadDashboard()">Dashboard</div>
+<div onclick="loadContratos()">Contratos</div>
 <div onclick="loadFacturas()">Facturas PX</div>
 <div onclick="loadImportGeneral()">Registro General</div>
 <div onclick="logout()">Cerrar Sesión</div>
@@ -85,7 +88,7 @@ loadDashboard();
 
 async function loadCurrentPeriod(){
 const {data}=await client.from("periods")
-.select("id,year,month,status")
+.select("year,month,status")
 .order("created_at",{ascending:false}).limit(1);
 if(!data)return;
 currentPeriodStatus=data[0].status;
@@ -98,6 +101,83 @@ function loadDashboard(){
 contentArea.innerHTML=`<div class="card"><h3>Dashboard SGI</h3></div>`;
 }
 
+/* ======================
+   MODULO CONTRATOS
+====================== */
+
+async function loadContratos(){
+
+const {data,error}=await client.from("contracts")
+.select("id,contract_number,description");
+
+if(error){contentArea.innerHTML="<div class='card'>Error cargando contratos</div>";return;}
+
+let rows="";
+data.forEach(c=>{
+const disabled=currentPeriodStatus==="CERRADO"?"disabled":"";
+rows+=`<tr>
+<td>${c.contract_number}</td>
+<td>${c.description}</td>
+<td>
+<button ${disabled} onclick="editContrato('${c.id}','${c.contract_number}','${c.description}')">Editar</button>
+</td>
+</tr>`;
+});
+
+const disabledCreate=currentPeriodStatus==="CERRADO"?"disabled":"";
+
+contentArea.innerHTML=`<div class="card">
+<h3>Contratos</h3>
+<button ${disabledCreate} onclick="createContrato()">Nuevo Contrato</button>
+<br><br>
+<table>
+<tr><th>Número</th><th>Descripción</th><th>Acción</th></tr>
+${rows}
+</table>
+</div>`;
+}
+
+async function createContrato(){
+
+if(currentPeriodStatus==="CERRADO"){alert("Período cerrado.");return;}
+
+const numero=prompt("Número de contrato:");
+if(!numero)return;
+
+const descripcion=prompt("Descripción:");
+if(!descripcion)return;
+
+const {error}=await client.from("contracts")
+.insert({contract_number:numero,description:descripcion});
+
+if(error){alert("Error al crear.");return;}
+
+loadContratos();
+}
+
+async function editContrato(id,numeroActual,descripcionActual){
+
+if(currentPeriodStatus==="CERRADO"){alert("Período cerrado.");return;}
+
+const nuevoNumero=prompt("Nuevo número:",numeroActual);
+if(!nuevoNumero)return;
+
+const nuevaDescripcion=prompt("Nueva descripción:",descripcionActual);
+if(!nuevaDescripcion)return;
+
+const {error}=await client.from("contracts")
+.update({contract_number:nuevoNumero,description:nuevaDescripcion})
+.eq("id",id);
+
+if(error){alert("Error al actualizar.");return;}
+
+loadContratos();
+}
+
+/* ======================
+   MODULO FACTURAS
+====================== */
+
 async function loadFacturas(){
 const {data}=await client.from("invoices_px")
 .select("invoice_number,total_amount,status");
@@ -109,57 +189,31 @@ rows+=`<tr><td>${f.invoice_number}</td>
 });
 contentArea.innerHTML=`<div class="card">
 <h3>Facturas PX</h3>
-<table border="1" width="100%">
+<table>
 <tr><th>Número</th><th>Total</th><th>Estado</th></tr>
 ${rows}</table></div>`;
 }
 
+/* ======================
+   MODULO IMPORT GENERAL
+====================== */
+
 async function loadImportGeneral(){
-
-const {data,error}=await client.from("import_general")
-.select("id,total_px,total_gdn,total_import");
-
-if(error){contentArea.innerHTML="<div class='card'>Error</div>";return;}
-
+const {data}=await client.from("import_general")
+.select("total_px,total_gdn,total_import");
 let rows="";
-
 data.forEach(r=>{
-const disabled=currentPeriodStatus==="CERRADO"?"disabled":"";
 rows+=`<tr>
 <td>${r.total_px}</td>
 <td>${r.total_gdn}</td>
 <td>${r.total_import}</td>
-<td><button ${disabled} onclick="editImport('${r.id}',${r.total_px},${r.total_gdn})">Editar</button></td>
 </tr>`;
 });
-
 contentArea.innerHTML=`<div class="card">
-<h3>Registro General Importación</h3>
-<table border="1" width="100%">
-<tr><th>Total PX</th><th>Total GDN</th><th>Total Importación</th><th>Acción</th></tr>
+<h3>Registro General</h3>
+<table>
+<tr><th>Total PX</th><th>Total GDN</th><th>Total Importación</th></tr>
 ${rows}</table></div>`;
-}
-
-async function editImport(id,px,gdn){
-
-if(currentPeriodStatus==="CERRADO"){
-alert("Período cerrado.");
-return;
-}
-
-const nuevoGDN=prompt("Nuevo Total GDN:",gdn);
-if(!nuevoGDN)return;
-
-const nuevoTotal=Number(px)+Number(nuevoGDN);
-
-const {data,error}=await client.from("import_general")
-.update({total_gdn:Number(nuevoGDN),total_import:nuevoTotal})
-.eq("id",id).select();
-
-if(error||data.length===0){alert("Bloqueado por RLS");return;}
-
-alert("Actualizado correctamente.");
-loadImportGeneral();
 }
 
 loadApp();
