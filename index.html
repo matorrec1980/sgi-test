@@ -8,8 +8,10 @@
 <style>
 body { margin:0; font-family:Arial; background:#F5F6F8; }
 .layout { display:none; height:100vh; }
-.sidebar { width:240px; background:#1F2937; color:white; padding:20px; }
-.sidebar div { margin:15px 0; cursor:pointer; }
+.sidebar { width:260px; background:#1F2937; color:white; padding:20px; }
+.sidebar h3 { margin-top:0; }
+.sidebar .section { margin-top:25px; font-size:12px; color:#9CA3AF; text-transform:uppercase; }
+.sidebar div { margin:12px 0; cursor:pointer; }
 .sidebar div:hover { color:#60A5FA; }
 .main { flex:1; display:flex; flex-direction:column; }
 .header { background:white; padding:15px 25px; display:flex; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
@@ -17,7 +19,7 @@ body { margin:0; font-family:Arial; background:#F5F6F8; }
 .card { background:white; padding:20px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
 button { padding:8px 12px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; }
 button:disabled { background:#9CA3AF; }
-input { padding:8px; margin-bottom:10px; width:100%; }
+input, select { padding:8px; margin-bottom:10px; width:100%; }
 .login-container { display:flex; height:100vh; align-items:center; justify-content:center; }
 .login-box { background:white; padding:40px; border-radius:8px; box-shadow:0 5px 20px rgba(0,0,0,0.1); width:320px; }
 table { border-collapse:collapse; width:100%; }
@@ -41,10 +43,17 @@ th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; }
 
 <div class="sidebar">
 <h3>SGI</h3>
+
+<div class="section">Operación</div>
 <div onclick="loadDashboard()">Dashboard</div>
 <div onclick="loadContratos()">Contratos</div>
 <div onclick="loadFacturas()">Facturas PX</div>
 <div onclick="loadImportGeneral()">Registro General</div>
+
+<div class="section">Maestros</div>
+<div onclick="loadSubpartidas()">Subpartidas ISD</div>
+
+<div class="section"></div>
 <div onclick="logout()">Cerrar Sesión</div>
 </div>
 
@@ -65,6 +74,7 @@ const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
 const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let currentPeriodStatus=null;
+let currentUserRole=null;
 
 async function login(){
 const {data,error}=await client.auth.signInWithPassword({
@@ -81,7 +91,8 @@ if(!data.session)return;
 loginContainer.style.display="none";
 appLayout.style.display="flex";
 const role=await client.rpc("current_user_role");
-userInfo.innerText=data.session.user.email+" | Rol: "+role.data;
+currentUserRole=role.data;
+userInfo.innerText=data.session.user.email+" | Rol: "+currentUserRole;
 await loadCurrentPeriod();
 loadDashboard();
 }
@@ -102,118 +113,95 @@ contentArea.innerHTML=`<div class="card"><h3>Dashboard SGI</h3></div>`;
 }
 
 /* ======================
-   MODULO CONTRATOS
+   MODULO SUBPARTIDAS
 ====================== */
 
-async function loadContratos(){
+async function loadSubpartidas(){
 
-const {data,error}=await client.from("contracts")
-.select("id,contract_number,description");
+const {data,error}=await client.from("subpartidas")
+.select("id,codigo_subpartida,descripcion,porcentaje_isd,estado");
 
-if(error){contentArea.innerHTML="<div class='card'>Error cargando contratos</div>";return;}
+if(error){contentArea.innerHTML="<div class='card'>Error</div>";return;}
 
 let rows="";
-data.forEach(c=>{
-const disabled=currentPeriodStatus==="CERRADO"?"disabled":"";
+data.forEach(s=>{
+const editBtn=currentUserRole==="ADMIN"
+? `<button onclick="editSubpartida('${s.id}','${s.codigo_subpartida}','${s.descripcion}',${s.porcentaje_isd},'${s.estado}')">Editar</button>`
+: "";
+
 rows+=`<tr>
-<td>${c.contract_number}</td>
-<td>${c.description}</td>
-<td>
-<button ${disabled} onclick="editContrato('${c.id}','${c.contract_number}','${c.description}')">Editar</button>
-</td>
+<td>${s.codigo_subpartida}</td>
+<td>${s.descripcion}</td>
+<td>${s.porcentaje_isd}%</td>
+<td>${s.estado}</td>
+<td>${editBtn}</td>
 </tr>`;
 });
 
-const disabledCreate=currentPeriodStatus==="CERRADO"?"disabled":"";
+const newBtn=currentUserRole==="ADMIN"
+? `<button onclick="createSubpartida()">Nueva Subpartida</button>`
+: "";
 
 contentArea.innerHTML=`<div class="card">
-<h3>Contratos</h3>
-<button ${disabledCreate} onclick="createContrato()">Nuevo Contrato</button>
+<h3>Subpartidas ISD</h3>
+${newBtn}
 <br><br>
 <table>
-<tr><th>Número</th><th>Descripción</th><th>Acción</th></tr>
+<tr><th>Código</th><th>Descripción</th><th>% ISD</th><th>Estado</th><th></th></tr>
 ${rows}
 </table>
 </div>`;
 }
 
-async function createContrato(){
+async function createSubpartida(){
 
-if(currentPeriodStatus==="CERRADO"){alert("Período cerrado.");return;}
-
-const numero=prompt("Número de contrato:");
-if(!numero)return;
+const codigo=prompt("Código:");
+if(!codigo)return;
 
 const descripcion=prompt("Descripción:");
 if(!descripcion)return;
 
-const {error}=await client.from("contracts")
-.insert({contract_number:numero,description:descripcion});
+const porcentaje=prompt("Porcentaje ISD:");
+if(!porcentaje)return;
 
-if(error){alert("Error al crear.");return;}
+const {error}=await client.from("subpartidas")
+.insert({
+codigo_subpartida:codigo,
+descripcion:descripcion,
+porcentaje_isd:Number(porcentaje)
+});
 
-loadContratos();
+if(error){alert("Error");return;}
+
+loadSubpartidas();
 }
 
-async function editContrato(id,numeroActual,descripcionActual){
+async function editSubpartida(id,codigo,descripcion,porcentaje,estado){
 
-if(currentPeriodStatus==="CERRADO"){alert("Período cerrado.");return;}
+const nuevoCodigo=prompt("Código:",codigo);
+if(!nuevoCodigo)return;
 
-const nuevoNumero=prompt("Nuevo número:",numeroActual);
-if(!nuevoNumero)return;
+const nuevaDesc=prompt("Descripción:",descripcion);
+if(!nuevaDesc)return;
 
-const nuevaDescripcion=prompt("Nueva descripción:",descripcionActual);
-if(!nuevaDescripcion)return;
+const nuevoPorcentaje=prompt("Porcentaje:",porcentaje);
+if(!nuevoPorcentaje)return;
 
-const {error}=await client.from("contracts")
-.update({contract_number:nuevoNumero,description:nuevaDescripcion})
+const nuevoEstado=prompt("Estado (ACTIVA/INACTIVA):",estado);
+if(!nuevoEstado)return;
+
+const {error}=await client.from("subpartidas")
+.update({
+codigo_subpartida:nuevoCodigo,
+descripcion:nuevaDesc,
+porcentaje_isd:Number(nuevoPorcentaje),
+estado:nuevoEstado
+})
 .eq("id",id);
 
-if(error){alert("Error al actualizar.");return;}
+if(error){alert("Error");return;}
 
-loadContratos();
-}
-
-/* ======================
-   MODULO FACTURAS
-====================== */
-
-async function loadFacturas(){
-const {data}=await client.from("invoices_px")
-.select("invoice_number,total_amount,status");
-let rows="";
-data.forEach(f=>{
-rows+=`<tr><td>${f.invoice_number}</td>
-<td>${f.total_amount}</td>
-<td>${f.status}</td></tr>`;
-});
-contentArea.innerHTML=`<div class="card">
-<h3>Facturas PX</h3>
-<table>
-<tr><th>Número</th><th>Total</th><th>Estado</th></tr>
-${rows}</table></div>`;
-}
-
-/* ======================
-   MODULO IMPORT GENERAL
-====================== */
-
-async function loadImportGeneral(){
-const {data}=await client.from("import_general")
-.select("total_px,total_gdn,total_import");
-let rows="";
-data.forEach(r=>{
-rows+=`<tr>
-<td>${r.total_px}</td>
-<td>${r.total_gdn}</td>
-<td>${r.total_import}</td>
-</tr>`;
-});
-contentArea.innerHTML=`<div class="card">
-<h3>Registro General</h3>
-<table>
-<tr><th>Total PX</th><th>Total GDN</th><th>Total Importación</th></tr>
-${rows}</table></div>`;
+loadSubpartidas();
 }
 
 loadApp();
