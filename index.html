@@ -2,12 +2,12 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>SGI RLS Security Test</title>
+  <title>SGI Payment RLS Test</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>SGI RLS Security Test</h2>
+<h2>SGI Payment Requests RLS Test</h2>
 
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Password">
@@ -27,7 +27,6 @@ const SUPABASE_KEY = "sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function login() {
-
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
@@ -47,30 +46,24 @@ async function login() {
 }
 
 async function logout() {
-
   await client.auth.signOut();
-  document.getElementById("result").innerText =
-    "Logged out.";
+  document.getElementById("result").innerText = "Logged out.";
 }
 
 async function checkSession() {
-
   const { data } = await client.auth.getSession();
 
   if (!data.session) {
-    document.getElementById("result").innerText =
-      "NO SESSION";
+    document.getElementById("result").innerText = "NO SESSION";
     return;
   }
 
-  const { data: roleData } = await client
-    .rpc("current_user_role");
+  const { data: roleData } = await client.rpc("current_user_role");
 
   document.getElementById("result").innerText =
     "SESSION ACTIVE\n" +
     "Email: " + data.session.user.email + "\n" +
-    "User ID: " + data.session.user.id + "\n" +
-    "ROLE FROM DB:\n" + roleData;
+    "Role: " + roleData;
 }
 
 async function testUpdate() {
@@ -84,9 +77,9 @@ async function testUpdate() {
   }
 
   const { data, error } = await client
-    .from("liquidation_items")
-    .update({ original_value: Math.floor(Math.random() * 10000) })
-    .eq("id", "737bf92b-5e1b-4fac-8a96-eb2743317e36")
+    .from("payment_requests")
+    .update({ total_isd: Math.floor(Math.random() * 500) })
+    .eq("id", "c72982ca-6370-4ed4-8a3e-fc40a702e33b")
     .select();
 
   if (error) {
