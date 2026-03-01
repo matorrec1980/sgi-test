@@ -17,13 +17,14 @@ body { margin:0; font-family:Arial; background:#F5F6F8; }
 .header { background:white; padding:15px 25px; display:flex; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
 .content { padding:25px; overflow:auto; }
 .card { background:white; padding:20px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
-button { padding:8px 12px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; }
+button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; }
 button:disabled { background:#9CA3AF; }
-input, select { padding:8px; margin-bottom:10px; width:100%; }
+input, select { padding:6px; margin-bottom:8px; width:100%; }
+table { border-collapse:collapse; width:100%; }
+th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
+.small { font-size:12px; color:#6B7280; }
 .login-container { display:flex; height:100vh; align-items:center; justify-content:center; }
 .login-box { background:white; padding:40px; border-radius:8px; box-shadow:0 5px 20px rgba(0,0,0,0.1); width:320px; }
-table { border-collapse:collapse; width:100%; }
-th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; }
 </style>
 </head>
 
@@ -46,9 +47,7 @@ th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; }
 
 <div class="section">Operación</div>
 <div onclick="loadDashboard()">Dashboard</div>
-<div onclick="loadContratos()">Contratos</div>
 <div onclick="loadFacturas()">Facturas PX</div>
-<div onclick="loadImportGeneral()">Registro General</div>
 
 <div class="section">Maestros</div>
 <div onclick="loadSubpartidas()">Subpartidas ISD</div>
@@ -113,95 +112,144 @@ contentArea.innerHTML=`<div class="card"><h3>Dashboard SGI</h3></div>`;
 }
 
 /* ======================
-   MODULO SUBPARTIDAS
+   FACTURAS
 ====================== */
 
-async function loadSubpartidas(){
+async function loadFacturas(){
 
-const {data,error}=await client.from("subpartidas")
-.select("id,codigo_subpartida,descripcion,porcentaje_isd,estado");
-
-if(error){contentArea.innerHTML="<div class='card'>Error</div>";return;}
+const {data}=await client.from("invoices_px")
+.select("id,invoice_number,total_amount,status");
 
 let rows="";
-data.forEach(s=>{
-const editBtn=currentUserRole==="ADMIN"
-? `<button onclick="editSubpartida('${s.id}','${s.codigo_subpartida}','${s.descripcion}',${s.porcentaje_isd},'${s.estado}')">Editar</button>`
-: "";
-
+data.forEach(f=>{
 rows+=`<tr>
-<td>${s.codigo_subpartida}</td>
-<td>${s.descripcion}</td>
-<td>${s.porcentaje_isd}%</td>
-<td>${s.estado}</td>
-<td>${editBtn}</td>
+<td>${f.invoice_number}</td>
+<td>${f.total_amount}</td>
+<td>${f.status}</td>
+<td><button onclick="openFactura('${f.id}')">Abrir</button></td>
 </tr>`;
 });
 
-const newBtn=currentUserRole==="ADMIN"
-? `<button onclick="createSubpartida()">Nueva Subpartida</button>`
-: "";
-
 contentArea.innerHTML=`<div class="card">
-<h3>Subpartidas ISD</h3>
-${newBtn}
-<br><br>
+<h3>Facturas PX</h3>
 <table>
-<tr><th>Código</th><th>Descripción</th><th>% ISD</th><th>Estado</th><th></th></tr>
+<tr><th>Número</th><th>Total</th><th>Estado</th><th></th></tr>
 ${rows}
 </table>
 </div>`;
 }
 
-async function createSubpartida(){
+async function openFactura(invoiceId){
 
-const codigo=prompt("Código:");
-if(!codigo)return;
+const {data:items}=await client.from("invoice_items")
+.select("id,descripcion,cantidad,precio_unitario,valor_total,porcentaje_isd,valor_isd")
+.eq("invoice_id",invoiceId);
 
-const descripcion=prompt("Descripción:");
-if(!descripcion)return;
+let rows="";
+let totalFactura=0;
+let totalISD=0;
 
-const porcentaje=prompt("Porcentaje ISD:");
-if(!porcentaje)return;
-
-const {error}=await client.from("subpartidas")
-.insert({
-codigo_subpartida:codigo,
-descripcion:descripcion,
-porcentaje_isd:Number(porcentaje)
+items?.forEach(i=>{
+totalFactura+=Number(i.valor_total);
+totalISD+=Number(i.valor_isd);
+rows+=`<tr>
+<td>${i.descripcion}</td>
+<td>${i.cantidad}</td>
+<td>${i.precio_unitario}</td>
+<td>${i.valor_total}</td>
+<td>${i.porcentaje_isd}%</td>
+<td>${i.valor_isd}</td>
+</tr>`;
 });
 
-if(error){alert("Error");return;}
+const disabled=currentPeriodStatus==="CERRADO"?"disabled":"";
 
-loadSubpartidas();
+contentArea.innerHTML=`
+<div class="card">
+<h3>Detalle Factura</h3>
+
+<button ${disabled} onclick="addItem('${invoiceId}')">Agregar Línea</button>
+
+<br><br>
+<table>
+<tr>
+<th>Descripción</th>
+<th>Cantidad</th>
+<th>Precio</th>
+<th>Total</th>
+<th>% ISD</th>
+<th>ISD</th>
+</tr>
+${rows}
+</table>
+
+<br>
+<strong>Total Factura:</strong> ${totalFactura}<br>
+<strong>Total ISD:</strong> ${totalISD}
+</div>`;
 }
 
-async function editSubpartida(id,codigo,descripcion,porcentaje,estado){
+async function addItem(invoiceId){
 
-const nuevoCodigo=prompt("Código:",codigo);
-if(!nuevoCodigo)return;
+if(currentPeriodStatus==="CERRADO"){alert("Período cerrado");return;}
 
-const nuevaDesc=prompt("Descripción:",descripcion);
-if(!nuevaDesc)return;
+const {data:subs}=await client.from("subpartidas")
+.select("id,codigo_subpartida,porcentaje_isd")
+.eq("estado","ACTIVA");
 
-const nuevoPorcentaje=prompt("Porcentaje:",porcentaje);
-if(!nuevoPorcentaje)return;
+let options="";
+subs.forEach(s=>{
+options+=`${s.codigo_subpartida} (${s.porcentaje_isd}%)\n`;
+});
 
-const nuevoEstado=prompt("Estado (ACTIVA/INACTIVA):",estado);
-if(!nuevoEstado)return;
+const codigo=prompt("Seleccione Subpartida:\n"+options);
+if(!codigo)return;
 
-const {error}=await client.from("subpartidas")
-.update({
-codigo_subpartida:nuevoCodigo,
-descripcion:nuevaDesc,
-porcentaje_isd:Number(nuevoPorcentaje),
-estado:nuevoEstado
-})
-.eq("id",id);
+const sub= subs.find(s=>codigo.includes(s.codigo_subpartida));
+if(!sub){alert("Subpartida inválida");return;}
 
-if(error){alert("Error");return;}
+const descripcion=prompt("Descripción:");
+const cantidad=Number(prompt("Cantidad:"));
+const precio=Number(prompt("Precio unitario:"));
 
-loadSubpartidas();
+const total=cantidad*precio;
+const isd= total*(sub.porcentaje_isd/100);
+
+await client.from("invoice_items").insert({
+invoice_id:invoiceId,
+subpartida_id:sub.id,
+descripcion:descripcion,
+cantidad:cantidad,
+precio_unitario:precio,
+valor_total:total,
+porcentaje_isd:sub.porcentaje_isd,
+valor_isd:isd
+});
+
+openFactura(invoiceId);
+}
+
+/* ======================
+   SUBPARTIDAS
+====================== */
+
+async function loadSubpartidas(){
+const {data}=await client.from("subpartidas")
+.select("codigo_subpartida,descripcion,porcentaje_isd,estado");
+let rows="";
+data.forEach(s=>{
+rows+=`<tr>
+<td>${s.codigo_subpartida}</td>
+<td>${s.descripcion}</td>
+<td>${s.porcentaje_isd}%</td>
+<td>${s.estado}</td>
+</tr>`;
+});
+contentArea.innerHTML=`<div class="card">
+<h3>Subpartidas ISD</h3>
+<table>
+<tr><th>Código</th><th>Descripción</th><th>% ISD</th><th>Estado</th></tr>
+${rows}</table></div>`;
 }
 
 loadApp();
