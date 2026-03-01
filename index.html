@@ -1,36 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>SGI Role Debug</title>
+  <meta charset="UTF-8">
+  <title>SGI RLS Security Test</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>SGI Role Debug</h2>
+<h2>SGI RLS Security Test</h2>
 
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Password">
 
-<br><br>
-
 <button onclick="login()">Login</button>
 <button onclick="logout()">Logout</button>
 <button onclick="checkSession()">Check Session</button>
-<button onclick="checkRole()">Check Role (DB)</button>
 <button onclick="testUpdate()">Test Update</button>
 
-<pre id="result"></pre>
+<h3 id="result"></h3>
 
 <script>
 
 const SUPABASE_URL = "https://rnoprngmmqvrzfygyppg.supabase.co";
 const SUPABASE_KEY = "sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
 
-const { createClient } = supabase;
-const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function login() {
+
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
@@ -46,54 +43,55 @@ async function login() {
   }
 
   document.getElementById("result").innerText =
-    "LOGIN SUCCESS:\n" +
-    data.user.email;
+    "LOGIN SUCCESS\nUser ID: " + data.user.id;
 }
 
 async function logout() {
+
   await client.auth.signOut();
-  document.getElementById("result").innerText = "LOGGED OUT";
+  document.getElementById("result").innerText =
+    "Logged out.";
 }
 
 async function checkSession() {
+
   const { data } = await client.auth.getSession();
 
   if (!data.session) {
     document.getElementById("result").innerText =
-      "NO ACTIVE SESSION";
+      "NO SESSION";
     return;
   }
+
+  const { data: roleData } = await client
+    .rpc("current_user_role");
 
   document.getElementById("result").innerText =
     "SESSION ACTIVE\n" +
-    data.session.user.email;
-}
-
-async function checkRole() {
-
-  const { data, error } = await client.rpc('current_user_role');
-
-  if (error) {
-    document.getElementById("result").innerText =
-      "ROLE ERROR:\n" + error.message;
-    return;
-  }
-
-  document.getElementById("result").innerText =
-    "ROLE FROM DB:\n" + data;
+    "Email: " + data.session.user.email + "\n" +
+    "User ID: " + data.session.user.id + "\n" +
+    "ROLE FROM DB:\n" + roleData;
 }
 
 async function testUpdate() {
 
+  const { data: sessionData } = await client.auth.getSession();
+
+  if (!sessionData.session) {
+    document.getElementById("result").innerText =
+      "NO SESSION - UPDATE SHOULD FAIL";
+    return;
+  }
+
   const { data, error } = await client
-    .from("invoices_px")
-    .update({ invoice_number: "FAC-DEBUG" })
-    .eq("id", "6aa54fb0-6dac-4d6c-8318-6feedbbb7140")
+    .from("liquidation_items")
+    .update({ original_value: Math.floor(Math.random() * 10000) })
+    .eq("id", "737bf92b-5e1b-4fac-8a96-eb2743317e36")
     .select();
 
   if (error) {
     document.getElementById("result").innerText =
-      "BLOCKED:\n" + error.message;
+      "BLOCKED BY RLS:\n" + error.message;
     return;
   }
 
