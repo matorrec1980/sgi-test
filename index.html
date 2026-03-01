@@ -2,12 +2,12 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>SGI RLS Test</title>
+  <title>SGI Role Debug</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>SGI RLS Security Test</h2>
+<h2>SGI Role Debug</h2>
 
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Password">
@@ -17,6 +17,7 @@
 <button onclick="login()">Login</button>
 <button onclick="logout()">Logout</button>
 <button onclick="checkSession()">Check Session</button>
+<button onclick="checkRole()">Check Role (DB)</button>
 <button onclick="testUpdate()">Test Update</button>
 
 <pre id="result"></pre>
@@ -46,8 +47,7 @@ async function login() {
 
   document.getElementById("result").innerText =
     "LOGIN SUCCESS:\n" +
-    "Email: " + data.user.email + "\n" +
-    "User ID: " + data.user.id;
+    data.user.email;
 }
 
 async function logout() {
@@ -66,8 +66,21 @@ async function checkSession() {
 
   document.getElementById("result").innerText =
     "SESSION ACTIVE\n" +
-    "Email: " + data.session.user.email + "\n" +
-    "User ID: " + data.session.user.id;
+    data.session.user.email;
+}
+
+async function checkRole() {
+
+  const { data, error } = await client.rpc('current_user_role');
+
+  if (error) {
+    document.getElementById("result").innerText =
+      "ROLE ERROR:\n" + error.message;
+    return;
+  }
+
+  document.getElementById("result").innerText =
+    "ROLE FROM DB:\n" + data;
 }
 
 async function testUpdate() {
@@ -75,12 +88,12 @@ async function testUpdate() {
   const { data, error } = await client
     .from("invoices_px")
     .update({ invoice_number: "FAC-DEBUG" })
-    .eq("invoice_number", "FAC-001")
-    .select();   // ← IMPORTANTE: devuelve filas afectadas
+    .eq("id", "6aa54fb0-6dac-4d6c-8318-6feedbbb7140")
+    .select();
 
   if (error) {
     document.getElementById("result").innerText =
-      "BLOCKED BY RLS:\n" + error.message;
+      "BLOCKED:\n" + error.message;
     return;
   }
 
