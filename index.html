@@ -17,24 +17,10 @@ body { margin:0; font-family:Arial; background:#F5F6F8; }
 .header { background:white; padding:15px 25px; display:flex; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
 .content { padding:25px; overflow:auto; }
 .card { background:white; padding:20px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
-button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; }
-button:disabled { background:#9CA3AF; }
+button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; margin-top:10px; }
 input { padding:6px; margin-bottom:8px; width:100%; }
-table { border-collapse:collapse; width:100%; }
+table { border-collapse:collapse; width:100%; margin-top:10px; }
 th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
-.search-results {
-  border:1px solid #e5e7eb;
-  max-height:200px;
-  overflow:auto;
-  background:white;
-}
-.search-item {
-  padding:6px;
-  cursor:pointer;
-}
-.search-item:hover {
-  background:#F3F4F6;
-}
 </style>
 </head>
 
@@ -51,7 +37,6 @@ th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
 </div>
 
 <div class="layout" id="appLayout">
-
 <div class="sidebar">
 <h3>SGI</h3>
 <div class="section">Operación</div>
@@ -59,7 +44,6 @@ th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
 <div onclick="loadFacturas()">Facturas PX</div>
 <div class="section">Maestros</div>
 <div onclick="loadSubpartidas()">Subpartidas ISD</div>
-<div class="section"></div>
 <div onclick="logout()">Cerrar Sesión</div>
 </div>
 
@@ -70,7 +54,6 @@ th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
 </div>
 <div class="content" id="contentArea"></div>
 </div>
-
 </div>
 
 <script>
@@ -79,9 +62,7 @@ const SUPABASE_URL="https://rnoprngmmqvrzfygyppg.supabase.co";
 const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
 const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
-let currentPeriodStatus=null;
 let currentUserRole=null;
-let selectedSubpartida=null;
 
 async function login(){
 const {data,error}=await client.auth.signInWithPassword({
@@ -100,19 +81,7 @@ appLayout.style.display="flex";
 const role=await client.rpc("current_user_role");
 currentUserRole=role.data;
 userInfo.innerText=data.session.user.email+" | Rol: "+currentUserRole;
-await loadCurrentPeriod();
 loadDashboard();
-}
-
-async function loadCurrentPeriod(){
-const {data}=await client.from("periods")
-.select("year,month,status")
-.order("created_at",{ascending:false}).limit(1);
-if(!data)return;
-currentPeriodStatus=data[0].status;
-const color=currentPeriodStatus==="ABIERTO"?"#16A34A":"#DC2626";
-periodStatus.innerHTML="Período: "+data[0].year+"-"+data[0].month+
-" | Estado: <span style='color:"+color+"'>"+currentPeriodStatus+"</span>";
 }
 
 function loadDashboard(){
@@ -121,13 +90,12 @@ contentArea.innerHTML=`<div class="card"><h3>Dashboard SGI</h3></div>`;
 
 async function loadFacturas(){
 const {data}=await client.from("invoices_px")
-.select("id,invoice_number,total_amount,status");
+.select("id,invoice_number,status");
 
 let rows="";
 data.forEach(f=>{
 rows+=`<tr>
-<td>${f.invoice_number}</td>
-<td>${f.total_amount}</td>
+<td>${f.invoice_number || "-"}</td>
 <td>${f.status}</td>
 <td><button onclick="openFactura('${f.id}')">Abrir</button></td>
 </tr>`;
@@ -136,7 +104,7 @@ rows+=`<tr>
 contentArea.innerHTML=`<div class="card">
 <h3>Facturas PX</h3>
 <table>
-<tr><th>Número</th><th>Total</th><th>Estado</th><th></th></tr>
+<tr><th>Número</th><th>Estado</th><th></th></tr>
 ${rows}
 </table>
 </div>`;
@@ -144,81 +112,93 @@ ${rows}
 
 async function openFactura(invoiceId){
 
+const { data: factura } = await client
+.from("invoices_px")
+.select("*")
+.eq("id", invoiceId)
+.single();
+
+const { data: items } = await client
+.from("invoice_items")
+.select("descripcion,cantidad,valor_total")
+.eq("invoice_id", invoiceId);
+
+let totalItems = 0;
+if(items){
+items.forEach(i=> totalItems += Number(i.valor_total || 0));
+}
+
+const totalFactura =
+totalItems +
+Number(factura.freight || 0) +
+Number(factura.insurance || 0) +
+Number(factura.others || 0);
+
+let rows="";
+if(items && items.length>0){
+items.forEach(i=>{
+rows+=`<tr>
+<td>${i.descripcion}</td>
+<td>${i.cantidad}</td>
+<td>${i.valor_total}</td>
+</tr>`;
+});
+}else{
+rows=`<tr><td colspan="3">Sin ítems</td></tr>`;
+}
+
 contentArea.innerHTML=`
 <div class="card">
-<h3>Agregar Línea</h3>
+<h3>Factura PX</h3>
 
-<input type="text" id="searchSubpartida" placeholder="Buscar subpartida..."
-onkeyup="buscarSubpartida(this.value)">
-<div id="resultados" class="search-results"></div>
+<h4>Encabezado</h4>
 
-<input type="text" id="descripcion" placeholder="Descripción">
-<input type="number" id="cantidad" placeholder="Cantidad">
-<input type="number" id="precio" placeholder="Precio unitario">
+<label>Número Factura</label>
+<input type="text" value="${factura.invoice_number || ""}" disabled>
 
-<button onclick="guardarLinea('${invoiceId}')">Guardar</button>
+<label>Fecha Factura</label>
+<input type="date" value="${factura.fecha_factura || ""}" disabled>
+
+<label>Fecha Embarque</label>
+<input type="date" value="${factura.fecha_embarque || ""}" disabled>
+
+<label>BL</label>
+<input type="text" value="${factura.bl_number || ""}" disabled>
+
+<label>Freight</label>
+<input type="number" value="${factura.freight || 0}" disabled>
+
+<label>Insurance</label>
+<input type="number" value="${factura.insurance || 0}" disabled>
+
+<label>Others</label>
+<input type="number" value="${factura.others || 0}" disabled>
+
+<hr>
+
+<h4>Detalle</h4>
+
+<table>
+<tr>
+<th>Descripción</th>
+<th>Cantidad</th>
+<th>Valor Total</th>
+</tr>
+${rows}
+</table>
+
+<hr>
+
+<h4>Total Ítems: ${totalItems}</h4>
+<h3>Total Factura: ${totalFactura}</h3>
+
+<button onclick="activarEdicion('${invoiceId}')">Editar</button>
+
 </div>`;
 }
 
-async function buscarSubpartida(texto){
-
-if(texto.length < 3){
-document.getElementById("resultados").innerHTML="";
-return;
-}
-
-const {data}=await client
-.from("subpartidas")
-.select("id,codigo_subpartida,descripcion,porcentaje_isd")
-.eq("estado","ACTIVA")
-.lte("vigencia_desde", new Date().toISOString().split('T')[0])
-.or(`vigencia_hasta.is.null,vigencia_hasta.gte.${new Date().toISOString().split('T')[0]}`)
-.ilike("codigo_subpartida", `%${texto}%`)
-.limit(20);
-
-let html="";
-data.forEach(s=>{
-html+=`<div class="search-item"
-onclick="seleccionarSubpartida('${s.id}','${s.codigo_subpartida}','${s.descripcion}',${s.porcentaje_isd})">
-${s.codigo_subpartida} - ${s.descripcion} (${s.porcentaje_isd}%)
-</div>`;
-});
-
-document.getElementById("resultados").innerHTML=html;
-}
-
-function seleccionarSubpartida(id,codigo,desc,porcentaje){
-selectedSubpartida={id,codigo,desc,porcentaje};
-document.getElementById("searchSubpartida").value=codigo+" - "+desc;
-document.getElementById("resultados").innerHTML="";
-}
-
-async function guardarLinea(invoiceId){
-
-if(!selectedSubpartida){
-alert("Seleccione subpartida");
-return;
-}
-
-const descripcion=document.getElementById("descripcion").value;
-const cantidad=Number(document.getElementById("cantidad").value);
-const precio=Number(document.getElementById("precio").value);
-
-const total=cantidad*precio;
-const isd=total*(selectedSubpartida.porcentaje/100);
-
-await client.from("invoice_items").insert({
-invoice_id:invoiceId,
-subpartida_id:selectedSubpartida.id,
-descripcion:descripcion,
-cantidad:cantidad,
-precio_unitario:precio,
-valor_total:total,
-porcentaje_isd:selectedSubpartida.porcentaje,
-valor_isd:isd
-});
-
-alert("Línea guardada correctamente");
+function activarEdicion(invoiceId){
+alert("Modo edición siguiente fase.");
 }
 
 async function loadSubpartidas(){
@@ -237,10 +217,12 @@ rows+=`<tr>
 });
 
 contentArea.innerHTML=`<div class="card">
-<h3>Subpartidas ISD (primeras 50)</h3>
+<h3>Subpartidas ISD</h3>
 <table>
 <tr><th>Código</th><th>Descripción</th><th>% ISD</th><th>Estado</th></tr>
-${rows}</table></div>`;
+${rows}
+</table>
+</div>`;
 }
 
 loadApp();
