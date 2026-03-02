@@ -19,12 +19,22 @@ body { margin:0; font-family:Arial; background:#F5F6F8; }
 .card { background:white; padding:20px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
 button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; }
 button:disabled { background:#9CA3AF; }
-input, select { padding:6px; margin-bottom:8px; width:100%; }
+input { padding:6px; margin-bottom:8px; width:100%; }
 table { border-collapse:collapse; width:100%; }
 th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
-.small { font-size:12px; color:#6B7280; }
-.login-container { display:flex; height:100vh; align-items:center; justify-content:center; }
-.login-box { background:white; padding:40px; border-radius:8px; box-shadow:0 5px 20px rgba(0,0,0,0.1); width:320px; }
+.search-results {
+  border:1px solid #e5e7eb;
+  max-height:200px;
+  overflow:auto;
+  background:white;
+}
+.search-item {
+  padding:6px;
+  cursor:pointer;
+}
+.search-item:hover {
+  background:#F3F4F6;
+}
 </style>
 </head>
 
@@ -44,14 +54,11 @@ th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
 
 <div class="sidebar">
 <h3>SGI</h3>
-
 <div class="section">Operación</div>
 <div onclick="loadDashboard()">Dashboard</div>
 <div onclick="loadFacturas()">Facturas PX</div>
-
 <div class="section">Maestros</div>
 <div onclick="loadSubpartidas()">Subpartidas ISD</div>
-
 <div class="section"></div>
 <div onclick="logout()">Cerrar Sesión</div>
 </div>
@@ -74,6 +81,7 @@ const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let currentPeriodStatus=null;
 let currentUserRole=null;
+let selectedSubpartida=null;
 
 async function login(){
 const {data,error}=await client.auth.signInWithPassword({
@@ -111,12 +119,7 @@ function loadDashboard(){
 contentArea.innerHTML=`<div class="card"><h3>Dashboard SGI</h3></div>`;
 }
 
-/* ======================
-   FACTURAS
-====================== */
-
 async function loadFacturas(){
-
 const {data}=await client.from("invoices_px")
 .select("id,invoice_number,total_amount,status");
 
@@ -141,101 +144,88 @@ ${rows}
 
 async function openFactura(invoiceId){
 
-const {data:items}=await client.from("invoice_items")
-.select("id,descripcion,cantidad,precio_unitario,valor_total,porcentaje_isd,valor_isd")
-.eq("invoice_id",invoiceId);
-
-let rows="";
-let totalFactura=0;
-let totalISD=0;
-
-items?.forEach(i=>{
-totalFactura+=Number(i.valor_total);
-totalISD+=Number(i.valor_isd);
-rows+=`<tr>
-<td>${i.descripcion}</td>
-<td>${i.cantidad}</td>
-<td>${i.precio_unitario}</td>
-<td>${i.valor_total}</td>
-<td>${i.porcentaje_isd}%</td>
-<td>${i.valor_isd}</td>
-</tr>`;
-});
-
-const disabled=currentPeriodStatus==="CERRADO"?"disabled":"";
-
 contentArea.innerHTML=`
 <div class="card">
-<h3>Detalle Factura</h3>
+<h3>Agregar Línea</h3>
 
-<button ${disabled} onclick="addItem('${invoiceId}')">Agregar Línea</button>
+<input type="text" id="searchSubpartida" placeholder="Buscar subpartida..."
+onkeyup="buscarSubpartida(this.value)">
+<div id="resultados" class="search-results"></div>
 
-<br><br>
-<table>
-<tr>
-<th>Descripción</th>
-<th>Cantidad</th>
-<th>Precio</th>
-<th>Total</th>
-<th>% ISD</th>
-<th>ISD</th>
-</tr>
-${rows}
-</table>
+<input type="text" id="descripcion" placeholder="Descripción">
+<input type="number" id="cantidad" placeholder="Cantidad">
+<input type="number" id="precio" placeholder="Precio unitario">
 
-<br>
-<strong>Total Factura:</strong> ${totalFactura}<br>
-<strong>Total ISD:</strong> ${totalISD}
+<button onclick="guardarLinea('${invoiceId}')">Guardar</button>
 </div>`;
 }
 
-async function addItem(invoiceId){
+async function buscarSubpartida(texto){
 
-if(currentPeriodStatus==="CERRADO"){alert("Período cerrado");return;}
+if(texto.length < 3){
+document.getElementById("resultados").innerHTML="";
+return;
+}
 
-const {data:subs}=await client.from("subpartidas")
-.select("id,codigo_subpartida,porcentaje_isd")
-.eq("estado","ACTIVA");
+const {data}=await client
+.from("subpartidas")
+.select("id,codigo_subpartida,descripcion,porcentaje_isd")
+.eq("estado","ACTIVA")
+.lte("vigencia_desde", new Date().toISOString().split('T')[0])
+.or(`vigencia_hasta.is.null,vigencia_hasta.gte.${new Date().toISOString().split('T')[0]}`)
+.ilike("codigo_subpartida", `%${texto}%`)
+.limit(20);
 
-let options="";
-subs.forEach(s=>{
-options+=`${s.codigo_subpartida} (${s.porcentaje_isd}%)\n`;
+let html="";
+data.forEach(s=>{
+html+=`<div class="search-item"
+onclick="seleccionarSubpartida('${s.id}','${s.codigo_subpartida}','${s.descripcion}',${s.porcentaje_isd})">
+${s.codigo_subpartida} - ${s.descripcion} (${s.porcentaje_isd}%)
+</div>`;
 });
 
-const codigo=prompt("Seleccione Subpartida:\n"+options);
-if(!codigo)return;
+document.getElementById("resultados").innerHTML=html;
+}
 
-const sub= subs.find(s=>codigo.includes(s.codigo_subpartida));
-if(!sub){alert("Subpartida inválida");return;}
+function seleccionarSubpartida(id,codigo,desc,porcentaje){
+selectedSubpartida={id,codigo,desc,porcentaje};
+document.getElementById("searchSubpartida").value=codigo+" - "+desc;
+document.getElementById("resultados").innerHTML="";
+}
 
-const descripcion=prompt("Descripción:");
-const cantidad=Number(prompt("Cantidad:"));
-const precio=Number(prompt("Precio unitario:"));
+async function guardarLinea(invoiceId){
+
+if(!selectedSubpartida){
+alert("Seleccione subpartida");
+return;
+}
+
+const descripcion=document.getElementById("descripcion").value;
+const cantidad=Number(document.getElementById("cantidad").value);
+const precio=Number(document.getElementById("precio").value);
 
 const total=cantidad*precio;
-const isd= total*(sub.porcentaje_isd/100);
+const isd=total*(selectedSubpartida.porcentaje/100);
 
 await client.from("invoice_items").insert({
 invoice_id:invoiceId,
-subpartida_id:sub.id,
+subpartida_id:selectedSubpartida.id,
 descripcion:descripcion,
 cantidad:cantidad,
 precio_unitario:precio,
 valor_total:total,
-porcentaje_isd:sub.porcentaje_isd,
+porcentaje_isd:selectedSubpartida.porcentaje,
 valor_isd:isd
 });
 
-openFactura(invoiceId);
+alert("Línea guardada correctamente");
 }
-
-/* ======================
-   SUBPARTIDAS
-====================== */
 
 async function loadSubpartidas(){
 const {data}=await client.from("subpartidas")
-.select("codigo_subpartida,descripcion,porcentaje_isd,estado");
+.select("codigo_subpartida,descripcion,porcentaje_isd,estado")
+.limit(50);
+
 let rows="";
 data.forEach(s=>{
 rows+=`<tr>
@@ -245,8 +235,9 @@ rows+=`<tr>
 <td>${s.estado}</td>
 </tr>`;
 });
+
 contentArea.innerHTML=`<div class="card">
-<h3>Subpartidas ISD</h3>
+<h3>Subpartidas ISD (primeras 50)</h3>
 <table>
 <tr><th>Código</th><th>Descripción</th><th>% ISD</th><th>Estado</th></tr>
 ${rows}</table></div>`;
