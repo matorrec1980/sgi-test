@@ -17,7 +17,7 @@ body { margin:0; font-family:Arial; background:#F5F6F8; }
 .header { background:white; padding:15px 25px; display:flex; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
 .content { padding:25px; overflow:auto; }
 .card { background:white; padding:20px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
-button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; margin-top:10px; }
+button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; margin-top:10px; margin-right:5px; }
 input { padding:6px; margin-bottom:8px; width:100%; }
 table { border-collapse:collapse; width:100%; margin-top:10px; }
 th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
@@ -50,7 +50,6 @@ th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
 <div class="main">
 <div class="header">
 <div id="userInfo"></div>
-<div id="periodStatus"></div>
 </div>
 <div class="content" id="contentArea"></div>
 </div>
@@ -123,6 +122,11 @@ const { data: items } = await client
 .select("descripcion,cantidad,valor_total")
 .eq("invoice_id", invoiceId);
 
+renderFacturaVista(factura, items);
+}
+
+function renderFacturaVista(factura, items){
+
 let totalItems = 0;
 if(items){
 items.forEach(i=> totalItems += Number(i.valor_total || 0));
@@ -154,25 +158,25 @@ contentArea.innerHTML=`
 <h4>Encabezado</h4>
 
 <label>Número Factura</label>
-<input type="text" value="${factura.invoice_number || ""}" disabled>
+<input type="text" id="invoice_number" value="${factura.invoice_number || ""}" disabled>
 
 <label>Fecha Factura</label>
-<input type="date" value="${factura.fecha_factura || ""}" disabled>
+<input type="date" id="fecha_factura" value="${factura.fecha_factura || ""}" disabled>
 
 <label>Fecha Embarque</label>
-<input type="date" value="${factura.fecha_embarque || ""}" disabled>
+<input type="date" id="fecha_embarque" value="${factura.fecha_embarque || ""}" disabled>
 
 <label>BL</label>
-<input type="text" value="${factura.bl_number || ""}" disabled>
+<input type="text" id="bl_number" value="${factura.bl_number || ""}" disabled>
 
 <label>Freight</label>
-<input type="number" value="${factura.freight || 0}" disabled>
+<input type="number" id="freight" value="${factura.freight || 0}" disabled>
 
 <label>Insurance</label>
-<input type="number" value="${factura.insurance || 0}" disabled>
+<input type="number" id="insurance" value="${factura.insurance || 0}" disabled>
 
 <label>Others</label>
-<input type="number" value="${factura.others || 0}" disabled>
+<input type="number" id="others" value="${factura.others || 0}" disabled>
 
 <hr>
 
@@ -192,13 +196,44 @@ ${rows}
 <h4>Total Ítems: ${totalItems}</h4>
 <h3>Total Factura: ${totalFactura}</h3>
 
-<button onclick="activarEdicion('${invoiceId}')">Editar</button>
+<button onclick="activarEdicion('${factura.id}')">Editar</button>
 
 </div>`;
 }
 
 function activarEdicion(invoiceId){
-alert("Modo edición siguiente fase.");
+
+document.getElementById("invoice_number").disabled=false;
+document.getElementById("fecha_factura").disabled=false;
+document.getElementById("fecha_embarque").disabled=false;
+document.getElementById("bl_number").disabled=false;
+document.getElementById("freight").disabled=false;
+document.getElementById("insurance").disabled=false;
+document.getElementById("others").disabled=false;
+
+const botones = `
+<button onclick="guardarFactura('${invoiceId}')">Guardar Todo</button>
+<button onclick="openFactura('${invoiceId}')">Cancelar</button>
+`;
+
+document.querySelector(".card").insertAdjacentHTML("beforeend", botones);
+}
+
+async function guardarFactura(invoiceId){
+
+await client.from("invoices_px").update({
+invoice_number: document.getElementById("invoice_number").value,
+fecha_factura: document.getElementById("fecha_factura").value,
+fecha_embarque: document.getElementById("fecha_embarque").value,
+bl_number: document.getElementById("bl_number").value,
+freight: Number(document.getElementById("freight").value),
+insurance: Number(document.getElementById("insurance").value),
+others: Number(document.getElementById("others").value)
+}).eq("id", invoiceId);
+
+alert("Factura actualizada correctamente");
+
+openFactura(invoiceId);
 }
 
 async function loadSubpartidas(){
