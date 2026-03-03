@@ -9,20 +9,19 @@
 body{margin:0;font-family:Arial;background:#F5F6F8;}
 .layout{display:none;height:100vh;}
 .sidebar{width:260px;background:#1F2937;color:white;padding:20px;}
-.sidebar h3{margin-top:0;}
 .sidebar div{margin:10px 0;cursor:pointer;}
 .sidebar div:hover{color:#60A5FA;}
 .main{flex:1;display:flex;flex-direction:column;}
 .header{background:white;padding:15px;border-bottom:1px solid #e5e7eb;}
-.content{padding:20px;overflow:auto;}
+.content{padding:20px;}
 .card{background:white;padding:20px;border-radius:6px;margin-bottom:20px;}
-input,select{padding:6px;margin-bottom:8px;width:100%;}
-button{padding:6px 10px;background:#1D4ED8;color:white;border:none;border-radius:4px;cursor:pointer;margin-top:6px;margin-right:4px;}
+label{font-weight:bold;font-size:13px;}
+input,select{padding:6px;margin-bottom:10px;width:100%;}
+button{padding:6px 10px;background:#1D4ED8;color:white;border:none;border-radius:4px;cursor:pointer;margin-right:4px;}
 button.delete{background:#DC2626;}
 table{width:100%;border-collapse:collapse;margin-top:10px;}
 th,td{padding:6px;border-bottom:1px solid #e5e7eb;text-align:left;}
 .total{font-weight:bold;}
-hr{margin:15px 0;}
 </style>
 </head>
 
@@ -39,9 +38,6 @@ hr{margin:15px 0;}
 <div class="layout" id="appLayout">
 <div class="sidebar">
 <h3>SGI</h3>
-<div onclick="loadDashboard()">Dashboard</div>
-<div onclick="loadSuppliers()">Proveedores</div>
-<div onclick="loadContratos()">Contrato / PO</div>
 <div onclick="loadFacturas()">Facturas PX</div>
 <div onclick="logout()">Cerrar Sesión</div>
 </div>
@@ -79,196 +75,79 @@ if(!data.session)return;
 loginContainer.style.display="none";
 appLayout.style.display="flex";
 userInfo.innerText=data.session.user.email;
-loadDashboard();
-}
-
-function loadDashboard(){
-contentArea.innerHTML=`<div class="card"><h3>Dashboard</h3></div>`;
+loadFacturas();
 }
 
 //////////////////////////////////////////////////////////
-// PROVEEDORES
-//////////////////////////////////////////////////////////
-
-async function loadSuppliers(){
-const {data}=await client.from("suppliers").select("*");
-
-let rows="";
-data.forEach(s=>{
-rows+=`
-<tr>
-<td>${s.supplier_name}</td>
-<td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td>
-</tr>`;
-});
-
-contentArea.innerHTML=`
-<div class="card">
-<h3>Proveedores</h3>
-<input id="new_supplier" placeholder="Nombre proveedor">
-<button onclick="createSupplier()">Crear</button>
-<table>
-<tr><th>Proveedor</th><th></th></tr>
-${rows}
-</table>
-</div>`;
-}
-
-async function createSupplier(){
-await client.from("suppliers").insert({
-supplier_name:new_supplier.value
-});
-loadSuppliers();
-}
-
-async function deleteSupplier(id){
-await client.from("suppliers").delete().eq("id",id);
-loadSuppliers();
-}
-
-//////////////////////////////////////////////////////////
-// CONTRATOS
-//////////////////////////////////////////////////////////
-
-async function loadContratos(){
-
-const {data}=await client
-.from("contracts")
-.select("id,contract_number,total_amount,supplier_id,suppliers(supplier_name)");
-
-let rows="";
-data.forEach(c=>{
-rows+=`
-<tr>
-<td>${c.contract_number}</td>
-<td>${c.suppliers?.supplier_name||"-"}</td>
-<td>${c.total_amount||0}</td>
-<td>
-<button onclick="editarContrato('${c.id}')">Editar</button>
-<button class="delete" onclick="eliminarContrato('${c.id}')">Eliminar</button>
-</td>
-</tr>`;
-});
-
-contentArea.innerHTML=`
-<div class="card">
-<h3>Contrato / PO</h3>
-
-<input id="new_contract" placeholder="Número contrato">
-<select id="supplier_select"></select>
-<input id="new_amount" type="number" placeholder="Monto">
-<button onclick="createContract()">Crear</button>
-
-<table>
-<tr>
-<th>Número</th>
-<th>Proveedor</th>
-<th>Monto</th>
-<th></th>
-</tr>
-${rows}
-</table>
-</div>`;
-
-loadSupplierSelect("supplier_select");
-}
-
-async function loadSupplierSelect(selectId){
-const {data}=await client.from("suppliers").select("id,supplier_name");
-let select=document.getElementById(selectId);
-select.innerHTML="<option value=''>Seleccionar proveedor</option>";
-data.forEach(s=>{
-select.innerHTML+=`<option value="${s.id}">${s.supplier_name}</option>`;
-});
-}
-
-async function createContract(){
-await client.from("contracts").insert({
-contract_number:new_contract.value,
-supplier_id:supplier_select.value||null,
-total_amount:Number(new_amount.value||0)
-});
-loadContratos();
-}
-
-async function editarContrato(id){
-const {data}=await client.from("contracts").select("*").eq("id",id).single();
-
-contentArea.innerHTML=`
-<div class="card">
-<h3>Editar Contrato</h3>
-<input id="edit_contract_number" value="${data.contract_number}">
-<select id="edit_supplier"></select>
-<input id="edit_amount" type="number" value="${data.total_amount||0}">
-<button onclick="guardarContrato('${id}')">Guardar</button>
-<button onclick="loadContratos()">Cancelar</button>
-</div>`;
-
-await loadSupplierSelect("edit_supplier");
-document.getElementById("edit_supplier").value=data.supplier_id||"";
-}
-
-async function guardarContrato(id){
-await client.from("contracts").update({
-contract_number:edit_contract_number.value,
-supplier_id:edit_supplier.value||null,
-total_amount:Number(edit_amount.value||0)
-}).eq("id",id);
-loadContratos();
-}
-
-async function eliminarContrato(id){
-if(!confirm("¿Seguro que desea eliminar este contrato?")) return;
-
-const {error}=await client.from("contracts").delete().eq("id",id);
-
-if(error){
-alert("No se puede eliminar. Puede tener facturas asociadas.");
-return;
-}
-
-loadContratos();
-}
-
-//////////////////////////////////////////////////////////
-// FACTURAS (Cabecera + Ítems)
+// LISTA FACTURAS
 //////////////////////////////////////////////////////////
 
 async function loadFacturas(){
 
 const {data}=await client
 .from("invoices_px")
-.select("id,invoice_number,contracts(contract_number)");
+.select("id,invoice_number");
 
 let rows="";
+
 data.forEach(f=>{
 rows+=`
 <tr>
-<td>${f.invoice_number}</td>
-<td>${f.contracts?.contract_number||"Sin contrato"}</td>
-<td><button onclick="openFactura('${f.id}')">Abrir</button></td>
+<td>${f.invoice_number||"(Sin número)"}</td>
+<td>
+<button onclick="openFactura('${f.id}')">Abrir</button>
+<button class="delete" onclick="deleteFactura('${f.id}')">Eliminar</button>
+</td>
 </tr>`;
 });
 
 contentArea.innerHTML=`
 <div class="card">
 <h3>Facturas PX</h3>
-<input id="new_invoice" placeholder="Número factura">
+
+<label>Número factura</label>
+<input id="new_invoice">
+
 <button onclick="createFactura()">Crear</button>
 
 <table>
-<tr><th>Número</th><th>Contrato</th><th></th></tr>
+<tr><th>Número</th><th></th></tr>
 ${rows}
 </table>
 </div>`;
 }
 
 async function createFactura(){
+
+if(!new_invoice.value.trim()){
+alert("Debe ingresar número de factura");
+return;
+}
+
 await client.from("invoices_px").insert({
-invoice_number:new_invoice.value
+invoice_number:new_invoice.value.trim()
 });
+
 loadFacturas();
 }
+
+async function deleteFactura(id){
+
+if(!confirm("¿Eliminar factura?")) return;
+
+const {error}=await client.from("invoices_px").delete().eq("id",id);
+
+if(error){
+alert("No se puede eliminar. Puede tener pagos aplicados.");
+return;
+}
+
+loadFacturas();
+}
+
+//////////////////////////////////////////////////////////
+// DETALLE FACTURA
+//////////////////////////////////////////////////////////
 
 async function openFactura(id){
 
@@ -298,21 +177,26 @@ rows+=`
 
 contentArea.innerHTML=`
 <div class="card">
+
 <h3>Factura</h3>
 
-<input id="f_invoice" value="${factura.invoice_number}">
-<input type="number" id="f_freight" value="${factura.freight||0}" placeholder="Freight">
-<input type="number" id="f_insurance" value="${factura.insurance||0}" placeholder="Insurance">
-<input type="number" id="f_others" value="${factura.others||0}" placeholder="Others">
+<label>Número factura</label>
+<input id="f_invoice" value="${factura.invoice_number||""}">
+
+<label>Freight</label>
+<input type="number" id="f_freight" value="${factura.freight||0}">
+
+<label>Insurance</label>
+<input type="number" id="f_insurance" value="${factura.insurance||0}">
+
+<label>Others</label>
+<input type="number" id="f_others" value="${factura.others||0}">
+
+<button onclick="saveHeader('${id}')">Guardar Cabecera</button>
 
 <hr>
 
-<h4>Agregar Ítem</h4>
-<select id="subpartida_select"></select>
-<input id="item_desc" placeholder="Descripción">
-<input type="number" id="item_qty" placeholder="Cantidad">
-<input type="number" id="item_total" placeholder="Valor total">
-<button onclick="addItem('${id}')">Agregar</button>
+<h4>Ítems</h4>
 
 <table>
 <tr><th>Descripción</th><th>Cantidad</th><th>Total</th></tr>
@@ -321,40 +205,20 @@ ${rows}
 </table>
 
 <button onclick="loadFacturas()">Volver</button>
+
 </div>`;
-
-loadSubpartidasSelect();
 }
 
-async function loadSubpartidasSelect(){
-const {data}=await client
-.from("subpartidas")
-.select("id,codigo_subpartida")
-.eq("estado","ACTIVA")
-.limit(50);
+async function saveHeader(id){
 
-let select=document.getElementById("subpartida_select");
-select.innerHTML="";
-data.forEach(s=>{
-select.innerHTML+=`<option value="${s.id}">${s.codigo_subpartida}</option>`;
-});
-}
+await client.from("invoices_px").update({
+invoice_number:f_invoice.value.trim(),
+freight:Number(f_freight.value||0),
+insurance:Number(f_insurance.value||0),
+others:Number(f_others.value||0)
+}).eq("id",id);
 
-async function addItem(invoiceId){
-
-let qty=Number(item_qty.value);
-let total=Number(item_total.value);
-
-await client.from("invoice_items").insert({
-invoice_id:invoiceId,
-subpartida_id:subpartida_select.value,
-descripcion:item_desc.value,
-cantidad:qty,
-valor_total:total,
-precio_unitario:total/qty
-});
-
-openFactura(invoiceId);
+alert("Cabecera actualizada");
 }
 
 </script>
