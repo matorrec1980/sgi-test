@@ -14,27 +14,25 @@ body { margin:0; font-family:Arial; background:#F5F6F8; }
 .sidebar div { margin:12px 0; cursor:pointer; }
 .sidebar div:hover { color:#60A5FA; }
 .main { flex:1; display:flex; flex-direction:column; }
-.header { background:white; padding:15px 25px; display:flex; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
+.header { background:white; padding:15px 25px; border-bottom:1px solid #e5e7eb; }
 .content { padding:25px; overflow:auto; }
 .card { background:white; padding:20px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
 button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; margin-top:10px; margin-right:5px; }
-input { padding:6px; margin-bottom:8px; width:100%; }
+input, select { padding:6px; margin-bottom:8px; width:100%; }
 table { border-collapse:collapse; width:100%; margin-top:10px; }
 th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
-.highlight { font-weight:bold; }
+.warning { color:#DC2626; font-weight:bold; }
 </style>
 </head>
 
 <body>
 
-<div class="login-container" id="loginContainer">
-<div class="login-box">
+<div id="loginContainer">
 <h2>SGI</h2>
 <input type="email" id="email" placeholder="Correo">
 <input type="password" id="password" placeholder="Contraseña">
-<button onclick="login()" style="width:100%">Ingresar</button>
-<p id="loginMessage" style="color:red;text-align:center;"></p>
-</div>
+<button onclick="login()">Ingresar</button>
+<p id="loginMessage" style="color:red;"></p>
 </div>
 
 <div class="layout" id="appLayout">
@@ -43,19 +41,17 @@ th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
 
 <div class="section">Operación</div>
 <div onclick="loadDashboard()">Dashboard</div>
+<div onclick="loadContratos()">Contrato / PO</div>
 <div onclick="loadFacturas()">Facturas PX</div>
 
 <div class="section">Maestros</div>
-<div onclick="loadContratos()">Contrato / PO</div>
 <div onclick="loadSubpartidas()">Subpartidas ISD</div>
 
 <div onclick="logout()">Cerrar Sesión</div>
 </div>
 
 <div class="main">
-<div class="header">
-<div id="userInfo"></div>
-</div>
+<div class="header" id="userInfo"></div>
 <div class="content" id="contentArea"></div>
 </div>
 </div>
@@ -67,7 +63,7 @@ const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
 const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 async function login(){
-const {data,error}=await client.auth.signInWithPassword({
+const {error}=await client.auth.signInWithPassword({
 email:email.value,password:password.value});
 if(error){loginMessage.innerText=error.message;return;}
 loadApp();
@@ -85,34 +81,31 @@ loadDashboard();
 }
 
 function loadDashboard(){
-contentArea.innerHTML=`<div class="card"><h3>Dashboard SGI</h3></div>`;
+contentArea.innerHTML=`<div class="card"><h3>Dashboard</h3></div>`;
 }
 
-//////////////////////////////////////////////////////
-//  MÓDULO CONTRATO / PO
-//////////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// CONTRATO / PO
+//////////////////////////////////////////////////
 
 async function loadContratos(){
 
-const {data: contratos}=await client
-.from("contracts")
-.select("*");
+const {data}=await client.from("contracts").select("*");
 
 let rows="";
 
-for(const c of contratos){
+for(const c of data){
 
 const totalFacturado=await calcularTotalFacturado(c.id);
-const diferencia=Number(c.total_amount||0)-totalFacturado;
+const diferencia=(Number(c.total_amount||0)-totalFacturado);
 
-rows+=`<tr>
+rows+=`
+<tr>
 <td>${c.contract_number||"-"}</td>
-<td>${c.description||"-"}</td>
 <td>${c.total_amount||0}</td>
 <td>${totalFacturado}</td>
-<td class="highlight">${diferencia}</td>
+<td>${diferencia}</td>
 <td><button onclick="editarContrato('${c.id}')">Editar</button></td>
-<td><button onclick="verFacturasContrato('${c.id}')">Facturas</button></td>
 </tr>`;
 }
 
@@ -120,23 +113,18 @@ contentArea.innerHTML=`
 <div class="card">
 <h3>Contrato / PO</h3>
 
-<h4>Nuevo Contrato</h4>
-<input type="text" id="new_contract_number" placeholder="Número contrato / provisional">
-<input type="text" id="new_description" placeholder="Descripción">
-<input type="number" id="new_total_amount" placeholder="Monto total contrato">
+<input id="new_number" placeholder="Número contrato">
+<input id="new_desc" placeholder="Descripción">
+<input id="new_amount" type="number" placeholder="Monto contrato">
 
 <button onclick="crearContrato()">Crear</button>
-
-<hr>
 
 <table>
 <tr>
 <th>Número</th>
-<th>Descripción</th>
-<th>Monto Contrato</th>
+<th>Monto</th>
 <th>Total Facturado</th>
 <th>Diferencia</th>
-<th></th>
 <th></th>
 </tr>
 ${rows}
@@ -145,92 +133,129 @@ ${rows}
 }
 
 async function crearContrato(){
-
 await client.from("contracts").insert({
-contract_number: document.getElementById("new_contract_number").value,
-description: document.getElementById("new_description").value,
-total_amount: Number(document.getElementById("new_total_amount").value||0)
+contract_number:new_number.value,
+description:new_desc.value,
+total_amount:Number(new_amount.value||0)
 });
-
 loadContratos();
 }
 
 async function editarContrato(id){
-
-const {data:c}=await client
-.from("contracts")
-.select("*")
-.eq("id",id)
-.single();
+const {data}=await client.from("contracts").select("*").eq("id",id).single();
 
 contentArea.innerHTML=`
 <div class="card">
-<h3>Editar Contrato / PO</h3>
-
-<label>Número</label>
-<input type="text" id="edit_contract_number" value="${c.contract_number||""}">
-
-<label>Descripción</label>
-<input type="text" id="edit_description" value="${c.description||""}">
-
-<label>Monto Total</label>
-<input type="number" id="edit_total_amount" value="${c.total_amount||0}">
-
+<h3>Editar Contrato</h3>
+<input id="edit_number" value="${data.contract_number||""}">
+<input id="edit_desc" value="${data.description||""}">
+<input id="edit_amount" type="number" value="${data.total_amount||0}">
 <button onclick="guardarContrato('${id}')">Guardar</button>
 <button onclick="loadContratos()">Cancelar</button>
-
 </div>`;
 }
 
 async function guardarContrato(id){
-
 await client.from("contracts").update({
-contract_number: document.getElementById("edit_contract_number").value,
-description: document.getElementById("edit_description").value,
-total_amount: Number(document.getElementById("edit_total_amount").value||0)
+contract_number:edit_number.value,
+description:edit_desc.value,
+total_amount:Number(edit_amount.value||0)
 }).eq("id",id);
-
 loadContratos();
 }
 
-async function verFacturasContrato(contractId){
+//////////////////////////////////////////////////
+// FACTURAS
+//////////////////////////////////////////////////
 
-const {data:facturas}=await client
-.from("invoices_px")
-.select("*")
-.eq("contract_id",contractId);
+async function loadFacturas(){
+
+const {data}=await client.from("invoices_px").select("*");
 
 let rows="";
 
-for(const f of facturas){
+for(const f of data){
 
-const totalFactura=await calcularTotalFactura(f.id);
+const total=await calcularTotalFactura(f.id);
 
-rows+=`<tr>
+rows+=`
+<tr>
 <td>${f.invoice_number||"-"}</td>
-<td>${totalFactura}</td>
+<td>${total}</td>
+<td>${f.contract_id||"-"}</td>
+<td><button onclick="editarFactura('${f.id}')">Editar</button></td>
 </tr>`;
 }
 
 contentArea.innerHTML=`
 <div class="card">
-<h3>Facturas Asociadas</h3>
+<h3>Facturas PX</h3>
+
+<input id="new_invoice_number" placeholder="Número factura">
+<select id="new_contract_select"></select>
+<button onclick="crearFactura()">Crear</button>
 
 <table>
 <tr>
-<th>Número Factura</th>
-<th>Total Factura</th>
+<th>Número</th>
+<th>Total</th>
+<th>Contrato</th>
+<th></th>
 </tr>
 ${rows}
 </table>
-
-<button onclick="loadContratos()">Volver</button>
 </div>`;
+
+cargarContratosSelect("new_contract_select");
 }
 
-//////////////////////////////////////////////////////
-//  CÁLCULOS DINÁMICOS
-//////////////////////////////////////////////////////
+async function cargarContratosSelect(selectId){
+const {data}=await client.from("contracts").select("id,contract_number");
+const select=document.getElementById(selectId);
+select.innerHTML="<option value=''>Sin contrato</option>";
+data.forEach(c=>{
+select.innerHTML+=`<option value="${c.id}">${c.contract_number}</option>`;
+});
+}
+
+async function crearFactura(){
+await client.from("invoices_px").insert({
+invoice_number:new_invoice_number.value,
+contract_id:new_contract_select.value||null
+});
+loadFacturas();
+}
+
+async function editarFactura(id){
+
+const {data}=await client.from("invoices_px").select("*").eq("id",id).single();
+
+contentArea.innerHTML=`
+<div class="card">
+<h3>Editar Factura</h3>
+
+<input id="edit_invoice_number" value="${data.invoice_number||""}">
+<select id="edit_contract_select"></select>
+
+<button onclick="guardarFactura('${id}')">Guardar</button>
+<button onclick="loadFacturas()">Cancelar</button>
+</div>`;
+
+await cargarContratosSelect("edit_contract_select");
+document.getElementById("edit_contract_select").value=data.contract_id||"";
+}
+
+async function guardarFactura(id){
+await client.from("invoices_px").update({
+invoice_number:edit_invoice_number.value,
+contract_id:edit_contract_select.value||null
+}).eq("id",id);
+loadFacturas();
+}
+
+//////////////////////////////////////////////////
+// CÁLCULOS
+//////////////////////////////////////////////////
 
 async function calcularTotalFactura(invoiceId){
 
@@ -246,12 +271,12 @@ const {data:items}=await client
 .eq("invoice_id",invoiceId);
 
 let totalItems=0;
-items.forEach(i=> totalItems+=Number(i.valor_total||0));
+if(items) items.forEach(i=> totalItems+=Number(i.valor_total||0));
 
 return totalItems+
-Number(factura.freight||0)+
-Number(factura.insurance||0)+
-Number(factura.others||0);
+Number(factura?.freight||0)+
+Number(factura?.insurance||0)+
+Number(factura?.others||0);
 }
 
 async function calcularTotalFacturado(contractId){
@@ -262,19 +287,16 @@ const {data:facturas}=await client
 .eq("contract_id",contractId);
 
 let total=0;
-
+if(facturas){
 for(const f of facturas){
 total+=await calcularTotalFactura(f.id);
+}
 }
 
 return total;
 }
 
-//////////////////////////////////////////////////////
-
-async function loadFacturas(){
-contentArea.innerHTML=`<div class="card"><h3>Facturas PX</h3><p>Ir al módulo Facturas existente.</p></div>`;
-}
+//////////////////////////////////////////////////
 
 async function loadSubpartidas(){
 contentArea.innerHTML=`<div class="card"><h3>Subpartidas ISD</h3></div>`;
