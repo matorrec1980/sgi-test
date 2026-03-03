@@ -8,12 +8,12 @@
 <style>
 body{margin:0;font-family:Arial;background:#F5F6F8;}
 .layout{display:none;height:100vh;}
-.sidebar{width:260px;background:#1F2937;color:white;padding:20px;}
+.sidebar{width:250px;background:#1F2937;color:white;padding:20px;}
 .sidebar div{margin:10px 0;cursor:pointer;}
 .sidebar div:hover{color:#60A5FA;}
 .main{flex:1;display:flex;flex-direction:column;}
 .header{background:white;padding:15px;border-bottom:1px solid #e5e7eb;}
-.content{padding:20px;}
+.content{padding:20px;overflow:auto;}
 .card{background:white;padding:20px;border-radius:6px;margin-bottom:20px;}
 label{font-weight:bold;font-size:13px;}
 input,select{padding:6px;margin-bottom:10px;width:100%;}
@@ -22,6 +22,7 @@ button.delete{background:#DC2626;}
 table{width:100%;border-collapse:collapse;margin-top:10px;}
 th,td{padding:6px;border-bottom:1px solid #e5e7eb;text-align:left;}
 .total{font-weight:bold;}
+hr{margin:15px 0;}
 </style>
 </head>
 
@@ -38,6 +39,9 @@ th,td{padding:6px;border-bottom:1px solid #e5e7eb;text-align:left;}
 <div class="layout" id="appLayout">
 <div class="sidebar">
 <h3>SGI</h3>
+<div onclick="loadDashboard()">Dashboard</div>
+<div onclick="loadSuppliers()">Proveedores</div>
+<div onclick="loadContratos()">Contrato / PO</div>
 <div onclick="loadFacturas()">Facturas PX</div>
 <div onclick="logout()">Cerrar Sesión</div>
 </div>
@@ -55,13 +59,27 @@ const client=supabase.createClient(
 "sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W"
 );
 
+//////////////////////////////////////////////////////////
+// SESIÓN PERSISTENTE
+//////////////////////////////////////////////////////////
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const { data } = await client.auth.getSession();
+  if (data.session) {
+    loginContainer.style.display="none";
+    appLayout.style.display="flex";
+    userInfo.innerText=data.session.user.email;
+    loadDashboard();
+  }
+});
+
 async function login(){
 const {error}=await client.auth.signInWithPassword({
 email:email.value,
 password:password.value
 });
 if(error){loginMessage.innerText=error.message;return;}
-loadApp();
+location.reload();
 }
 
 async function logout(){
@@ -69,33 +87,136 @@ await client.auth.signOut();
 location.reload();
 }
 
-async function loadApp(){
-const {data}=await client.auth.getSession();
-if(!data.session)return;
-loginContainer.style.display="none";
-appLayout.style.display="flex";
-userInfo.innerText=data.session.user.email;
-loadFacturas();
+//////////////////////////////////////////////////////////
+// DASHBOARD
+//////////////////////////////////////////////////////////
+
+function loadDashboard(){
+contentArea.innerHTML=`<div class="card"><h3>Dashboard</h3></div>`;
 }
 
 //////////////////////////////////////////////////////////
-// LISTA FACTURAS
+// PROVEEDORES
+//////////////////////////////////////////////////////////
+
+async function loadSuppliers(){
+const {data}=await client.from("suppliers").select("*");
+
+let rows="";
+data.forEach(s=>{
+rows+=`
+<tr>
+<td>${s.supplier_name}</td>
+<td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td>
+</tr>`;
+});
+
+contentArea.innerHTML=`
+<div class="card">
+<h3>Proveedores</h3>
+<input id="new_supplier" placeholder="Nombre proveedor">
+<button onclick="createSupplier()">Crear</button>
+<table>
+<tr><th>Proveedor</th><th></th></tr>
+${rows}
+</table>
+</div>`;
+}
+
+async function createSupplier(){
+if(!new_supplier.value.trim()) return;
+await client.from("suppliers").insert({supplier_name:new_supplier.value.trim()});
+loadSuppliers();
+}
+
+async function deleteSupplier(id){
+await client.from("suppliers").delete().eq("id",id);
+loadSuppliers();
+}
+
+//////////////////////////////////////////////////////////
+// CONTRATOS
+//////////////////////////////////////////////////////////
+
+async function loadContratos(){
+
+const {data}=await client
+.from("contracts")
+.select("id,contract_number,total_amount,suppliers(supplier_name)");
+
+let rows="";
+data.forEach(c=>{
+rows+=`
+<tr>
+<td>${c.contract_number}</td>
+<td>${c.suppliers?.supplier_name||"-"}</td>
+<td>${c.total_amount||0}</td>
+<td>
+<button onclick="editContrato('${c.id}')">Editar</button>
+<button class="delete" onclick="deleteContrato('${c.id}')">Eliminar</button>
+</td>
+</tr>`;
+});
+
+contentArea.innerHTML=`
+<div class="card">
+<h3>Contrato / PO</h3>
+<input id="c_number" placeholder="Número contrato">
+<select id="c_supplier"></select>
+<input type="number" id="c_amount" placeholder="Monto">
+<button onclick="createContrato()">Crear</button>
+
+<table>
+<tr><th>Número</th><th>Proveedor</th><th>Monto</th><th></th></tr>
+${rows}
+</table>
+</div>`;
+
+loadSupplierSelect("c_supplier");
+}
+
+async function loadSupplierSelect(id){
+const {data}=await client.from("suppliers").select("*");
+let select=document.getElementById(id);
+select.innerHTML="<option value=''>Sin proveedor</option>";
+data.forEach(s=>{
+select.innerHTML+=`<option value="${s.id}">${s.supplier_name}</option>`;
+});
+}
+
+async function createContrato(){
+await client.from("contracts").insert({
+contract_number:c_number.value.trim(),
+supplier_id:c_supplier.value||null,
+total_amount:Number(c_amount.value||0)
+});
+loadContratos();
+}
+
+async function deleteContrato(id){
+await client.from("contracts").delete().eq("id",id);
+loadContratos();
+}
+
+//////////////////////////////////////////////////////////
+// FACTURAS
 //////////////////////////////////////////////////////////
 
 async function loadFacturas(){
 
 const {data}=await client
 .from("invoices_px")
-.select("id,invoice_number");
+.select("id,invoice_number,contracts(contract_number,suppliers(supplier_name))");
 
 let rows="";
-
 data.forEach(f=>{
 rows+=`
 <tr>
-<td>${f.invoice_number||"(Sin número)"}</td>
+<td>${f.invoice_number}</td>
+<td>${f.contracts?.contract_number||"Sin contrato"}</td>
+<td>${f.contracts?.suppliers?.supplier_name||"-"}</td>
 <td>
-<button onclick="openFactura('${f.id}')">Abrir</button>
+<button onclick="openFactura('${f.id}')">Editar</button>
 <button class="delete" onclick="deleteFactura('${f.id}')">Eliminar</button>
 </td>
 </tr>`;
@@ -105,43 +226,29 @@ contentArea.innerHTML=`
 <div class="card">
 <h3>Facturas PX</h3>
 
-<label>Número factura</label>
-<input id="new_invoice">
-
+<input id="new_invoice" placeholder="Número factura">
 <button onclick="createFactura()">Crear</button>
 
 <table>
-<tr><th>Número</th><th></th></tr>
+<tr>
+<th>Número</th>
+<th>Contrato</th>
+<th>Proveedor</th>
+<th></th>
+</tr>
 ${rows}
 </table>
 </div>`;
 }
 
 async function createFactura(){
-
-if(!new_invoice.value.trim()){
-alert("Debe ingresar número de factura");
-return;
-}
-
-await client.from("invoices_px").insert({
-invoice_number:new_invoice.value.trim()
-});
-
+if(!new_invoice.value.trim()) return;
+await client.from("invoices_px").insert({invoice_number:new_invoice.value.trim()});
 loadFacturas();
 }
 
 async function deleteFactura(id){
-
-if(!confirm("¿Eliminar factura?")) return;
-
-const {error}=await client.from("invoices_px").delete().eq("id",id);
-
-if(error){
-alert("No se puede eliminar. Puede tener pagos aplicados.");
-return;
-}
-
+await client.from("invoices_px").delete().eq("id",id);
 loadFacturas();
 }
 
@@ -157,10 +264,17 @@ const {data:factura}=await client
 .eq("id",id)
 .single();
 
+const {data:contracts}=await client.from("contracts").select("id,contract_number");
+
 const {data:items}=await client
 .from("invoice_items")
-.select("id,descripcion,cantidad,valor_total")
+.select("*")
 .eq("invoice_id",id);
+
+let contractOptions="<option value=''>Sin contrato</option>";
+contracts.forEach(c=>{
+contractOptions+=`<option value="${c.id}" ${factura.contract_id==c.id?"selected":""}>${c.contract_number}</option>`;
+});
 
 let rows="";
 let total=0;
@@ -172,6 +286,7 @@ rows+=`
 <td>${i.descripcion}</td>
 <td>${i.cantidad}</td>
 <td>${i.valor_total}</td>
+<td><button class="delete" onclick="deleteItem('${i.id}','${id}')">X</button></td>
 </tr>`;
 });
 
@@ -182,6 +297,9 @@ contentArea.innerHTML=`
 
 <label>Número factura</label>
 <input id="f_invoice" value="${factura.invoice_number||""}">
+
+<label>Contrato</label>
+<select id="f_contract">${contractOptions}</select>
 
 <label>Freight</label>
 <input type="number" id="f_freight" value="${factura.freight||0}">
@@ -196,29 +314,69 @@ contentArea.innerHTML=`
 
 <hr>
 
-<h4>Ítems</h4>
+<h4>Agregar Ítem</h4>
+
+<select id="i_subpartida"></select>
+<input id="i_desc" placeholder="Descripción">
+<input type="number" id="i_qty" placeholder="Cantidad">
+<input type="number" id="i_total" placeholder="Valor total">
+<button onclick="addItem('${id}')">Agregar</button>
 
 <table>
-<tr><th>Descripción</th><th>Cantidad</th><th>Total</th></tr>
+<tr><th>Descripción</th><th>Cantidad</th><th>Total</th><th></th></tr>
 ${rows}
-<tr class="total"><td></td><td>Total</td><td>${total}</td></tr>
+<tr class="total"><td></td><td>Total</td><td>${total}</td><td></td></tr>
 </table>
 
 <button onclick="loadFacturas()">Volver</button>
 
 </div>`;
+
+loadSubpartidas();
+}
+
+async function loadSubpartidas(){
+const {data}=await client.from("subpartidas").select("id,codigo_subpartida").eq("estado","ACTIVA").limit(100);
+let select=document.getElementById("i_subpartida");
+select.innerHTML="";
+data.forEach(s=>{
+select.innerHTML+=`<option value="${s.id}">${s.codigo_subpartida}</option>`;
+});
 }
 
 async function saveHeader(id){
-
 await client.from("invoices_px").update({
 invoice_number:f_invoice.value.trim(),
+contract_id:f_contract.value||null,
 freight:Number(f_freight.value||0),
 insurance:Number(f_insurance.value||0),
 others:Number(f_others.value||0)
 }).eq("id",id);
-
 alert("Cabecera actualizada");
+}
+
+async function addItem(invoiceId){
+
+let qty=Number(i_qty.value);
+let total=Number(i_total.value);
+
+if(!qty || !total) return;
+
+await client.from("invoice_items").insert({
+invoice_id:invoiceId,
+subpartida_id:i_subpartida.value,
+descripcion:i_desc.value,
+cantidad:qty,
+valor_total:total,
+precio_unitario:total/qty
+});
+
+openFactura(invoiceId);
+}
+
+async function deleteItem(itemId,invoiceId){
+await client.from("invoice_items").delete().eq("id",itemId);
+openFactura(invoiceId);
 }
 
 </script>
