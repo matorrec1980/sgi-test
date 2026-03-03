@@ -18,6 +18,7 @@ body { margin:0; font-family:Arial; background:#F5F6F8; }
 .content { padding:25px; overflow:auto; }
 .card { background:white; padding:20px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
 button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-radius:4px; cursor:pointer; margin-top:8px; margin-right:5px; }
+button.delete { background:#DC2626; }
 input, select { padding:6px; margin-bottom:8px; width:100%; }
 table { border-collapse:collapse; width:100%; margin-top:10px; }
 th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
@@ -44,6 +45,7 @@ th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
 <div onclick="loadFacturas()">Facturas PX</div>
 
 <div class="section">Maestros</div>
+<div onclick="loadSuppliers()">Proveedores</div>
 <div onclick="loadSubpartidas()">Subpartidas ISD</div>
 
 <div onclick="logout()">Cerrar Sesión</div>
@@ -84,41 +86,107 @@ contentArea.innerHTML=`<div class="card"><h3>Dashboard</h3></div>`;
 }
 
 //////////////////////////////////////////////////////////
+// PROVEEDORES
+//////////////////////////////////////////////////////////
+
+async function loadSuppliers(){
+const {data}=await client.from("suppliers").select("*");
+
+let rows="";
+data.forEach(s=>{
+rows+=`
+<tr>
+<td>${s.supplier_name}</td>
+<td><button onclick="deleteSupplier('${s.id}')" class="delete">Eliminar</button></td>
+</tr>`;
+});
+
+contentArea.innerHTML=`
+<div class="card">
+<h3>Proveedores</h3>
+
+<input id="new_supplier" placeholder="Nombre proveedor">
+<button onclick="createSupplier()">Crear</button>
+
+<table>
+<tr><th>Proveedor</th><th></th></tr>
+${rows}
+</table>
+</div>`;
+}
+
+async function createSupplier(){
+await client.from("suppliers").insert({
+supplier_name:new_supplier.value
+});
+loadSuppliers();
+}
+
+async function deleteSupplier(id){
+await client.from("suppliers").delete().eq("id",id);
+loadSuppliers();
+}
+
+//////////////////////////////////////////////////////////
 // CONTRATOS
 //////////////////////////////////////////////////////////
 
 async function loadContratos(){
-const {data}=await client.from("contracts").select("*");
+
+const {data}=await client
+.from("contracts")
+.select("id,contract_number,total_amount,suppliers(supplier_name)");
 
 let rows="";
 data.forEach(c=>{
 rows+=`
 <tr>
 <td>${c.contract_number}</td>
+<td>${c.suppliers?.supplier_name||"-"}</td>
 <td>${c.total_amount||0}</td>
-<td><button onclick="editarContrato('${c.id}')">Editar</button></td>
+<td>
+<button onclick="editarContrato('${c.id}')">Editar</button>
+<button onclick="eliminarContrato('${c.id}')" class="delete">Eliminar</button>
+</td>
 </tr>`;
 });
 
 contentArea.innerHTML=`
 <div class="card">
 <h3>Contrato / PO</h3>
+
 <input id="new_number" placeholder="Número contrato">
-<input id="new_desc" placeholder="Descripción">
+<select id="new_supplier"></select>
 <input id="new_amount" type="number" placeholder="Monto contrato">
 <button onclick="crearContrato()">Crear</button>
 
 <table>
-<tr><th>Número</th><th>Monto</th><th></th></tr>
+<tr>
+<th>Número</th>
+<th>Proveedor</th>
+<th>Monto</th>
+<th></th>
+</tr>
 ${rows}
 </table>
 </div>`;
+
+cargarSuppliersSelect("new_supplier");
+}
+
+async function cargarSuppliersSelect(selectId){
+const {data}=await client.from("suppliers").select("id,supplier_name");
+const select=document.getElementById(selectId);
+select.innerHTML="";
+data.forEach(s=>{
+select.innerHTML+=`<option value="${s.id}">${s.supplier_name}</option>`;
+});
 }
 
 async function crearContrato(){
 await client.from("contracts").insert({
 contract_number:new_number.value,
-description:new_desc.value,
+supplier_id:new_supplier.value,
 total_amount:Number(new_amount.value||0)
 });
 loadContratos();
@@ -131,179 +199,34 @@ contentArea.innerHTML=`
 <div class="card">
 <h3>Editar Contrato</h3>
 <input id="edit_number" value="${data.contract_number}">
-<input id="edit_desc" value="${data.description||""}">
+<select id="edit_supplier"></select>
 <input id="edit_amount" type="number" value="${data.total_amount||0}">
 <button onclick="guardarContrato('${id}')">Guardar</button>
 <button onclick="loadContratos()">Cancelar</button>
 </div>`;
+
+await cargarSuppliersSelect("edit_supplier");
+document.getElementById("edit_supplier").value=data.supplier_id;
 }
 
 async function guardarContrato(id){
 await client.from("contracts").update({
 contract_number:edit_number.value,
-description:edit_desc.value,
+supplier_id:edit_supplier.value,
 total_amount:Number(edit_amount.value||0)
 }).eq("id",id);
 loadContratos();
 }
 
-//////////////////////////////////////////////////////////
-// FACTURAS
+async function eliminarContrato(id){
+await client.from("contracts").delete().eq("id",id);
+loadContratos();
+}
+
 //////////////////////////////////////////////////////////
 
 async function loadFacturas(){
-
-const {data}=await client
-.from("invoices_px")
-.select("id,invoice_number,contracts(contract_number)");
-
-let rows="";
-
-data.forEach(f=>{
-rows+=`
-<tr>
-<td>${f.invoice_number}</td>
-<td>${f.contracts?.contract_number||"Sin contrato"}</td>
-<td>
-<button onclick="editarFactura('${f.id}')">Encabezado</button>
-<button onclick="gestionarItems('${f.id}')">Ítems</button>
-</td>
-</tr>`;
-});
-
-contentArea.innerHTML=`
-<div class="card">
-<h3>Facturas PX</h3>
-
-<input id="new_invoice_number" placeholder="Número factura">
-<select id="new_contract_select"></select>
-<button onclick="crearFactura()">Crear</button>
-
-<table>
-<tr><th>Número</th><th>Contrato</th><th></th></tr>
-${rows}
-</table>
-</div>`;
-
-cargarContratosSelect("new_contract_select");
-}
-
-async function crearFactura(){
-await client.from("invoices_px").insert({
-invoice_number:new_invoice_number.value,
-contract_id:new_contract_select.value||null
-});
-loadFacturas();
-}
-
-async function editarFactura(id){
-
-const {data}=await client.from("invoices_px").select("*").eq("id",id).single();
-
-contentArea.innerHTML=`
-<div class="card">
-<h3>Encabezado Factura</h3>
-
-<input id="edit_invoice_number" value="${data.invoice_number||""}">
-<input type="date" id="edit_fecha_factura" value="${data.fecha_factura||""}">
-<input type="date" id="edit_fecha_embarque" value="${data.fecha_embarque||""}">
-<input id="edit_bl" placeholder="BL Number" value="${data.bl_number||""}">
-<input type="number" id="edit_freight" placeholder="Freight" value="${data.freight||0}">
-<input type="number" id="edit_insurance" placeholder="Insurance" value="${data.insurance||0}">
-<input type="number" id="edit_others" placeholder="Others" value="${data.others||0}">
-
-<select id="edit_contract_select"></select>
-
-<button onclick="guardarFactura('${id}')">Guardar</button>
-<button onclick="loadFacturas()">Volver</button>
-
-</div>`;
-
-await cargarContratosSelect("edit_contract_select");
-document.getElementById("edit_contract_select").value=data.contract_id||"";
-}
-
-async function guardarFactura(id){
-await client.from("invoices_px").update({
-invoice_number:edit_invoice_number.value,
-fecha_factura:edit_fecha_factura.value||null,
-fecha_embarque:edit_fecha_embarque.value||null,
-bl_number:edit_bl.value||null,
-freight:Number(edit_freight.value||0),
-insurance:Number(edit_insurance.value||0),
-others:Number(edit_others.value||0),
-contract_id:edit_contract_select.value||null
-}).eq("id",id);
-loadFacturas();
-}
-
-//////////////////////////////////////////////////////////
-// ITEMS
-//////////////////////////////////////////////////////////
-
-async function gestionarItems(invoiceId){
-
-const {data}=await client
-.from("invoice_items")
-.select("id,descripcion,cantidad,valor_total")
-.eq("invoice_id",invoiceId);
-
-let rows="";
-data.forEach(i=>{
-rows+=`
-<tr>
-<td>${i.descripcion}</td>
-<td>${i.cantidad}</td>
-<td>${i.valor_total}</td>
-</tr>`;
-});
-
-contentArea.innerHTML=`
-<div class="card">
-<h3>Ítems Factura</h3>
-
-<input id="item_desc" placeholder="Descripción">
-<input type="number" id="item_cantidad" placeholder="Cantidad">
-<input type="number" id="item_total" placeholder="Valor total">
-
-<button onclick="agregarItem('${invoiceId}')">Agregar</button>
-
-<table>
-<tr><th>Descripción</th><th>Cantidad</th><th>Total</th></tr>
-${rows}
-</table>
-
-<button onclick="loadFacturas()">Volver</button>
-</div>`;
-}
-
-async function agregarItem(invoiceId){
-
-const cantidad=Number(item_cantidad.value);
-const total=Number(item_total.value);
-
-await client.from("invoice_items").insert({
-invoice_id:invoiceId,
-descripcion:item_desc.value,
-cantidad:cantidad,
-valor_total:total,
-precio_unitario: total/cantidad,
-porcentaje_isd:0,
-valor_isd:0
-});
-
-gestionarItems(invoiceId);
-}
-
-//////////////////////////////////////////////////////////
-
-async function cargarContratosSelect(selectId){
-const {data}=await client.from("contracts").select("id,contract_number");
-const select=document.getElementById(selectId);
-select.innerHTML="<option value=''>Sin contrato</option>";
-data.forEach(c=>{
-select.innerHTML+=`<option value="${c.id}">${c.contract_number}</option>`;
-});
+contentArea.innerHTML=`<div class="card"><h3>Facturas PX</h3></div>`;
 }
 
 async function loadSubpartidas(){
