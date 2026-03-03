@@ -21,6 +21,7 @@ button { padding:6px 10px; background:#1D4ED8; color:white; border:none; border-
 input { padding:6px; margin-bottom:8px; width:100%; }
 table { border-collapse:collapse; width:100%; margin-top:10px; }
 th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
+.highlight { font-weight:bold; }
 </style>
 </head>
 
@@ -39,11 +40,15 @@ th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
 <div class="layout" id="appLayout">
 <div class="sidebar">
 <h3>SGI</h3>
+
 <div class="section">Operación</div>
 <div onclick="loadDashboard()">Dashboard</div>
 <div onclick="loadFacturas()">Facturas PX</div>
+
 <div class="section">Maestros</div>
+<div onclick="loadContratos()">Contrato / PO</div>
 <div onclick="loadSubpartidas()">Subpartidas ISD</div>
+
 <div onclick="logout()">Cerrar Sesión</div>
 </div>
 
@@ -61,8 +66,6 @@ const SUPABASE_URL="https://rnoprngmmqvrzfygyppg.supabase.co";
 const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
 const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
-let currentUserRole=null;
-
 async function login(){
 const {data,error}=await client.auth.signInWithPassword({
 email:email.value,password:password.value});
@@ -77,9 +80,7 @@ const {data}=await client.auth.getSession();
 if(!data.session)return;
 loginContainer.style.display="none";
 appLayout.style.display="flex";
-const role=await client.rpc("current_user_role");
-currentUserRole=role.data;
-userInfo.innerText=data.session.user.email+" | Rol: "+currentUserRole;
+userInfo.innerText=data.session.user.email;
 loadDashboard();
 }
 
@@ -87,177 +88,196 @@ function loadDashboard(){
 contentArea.innerHTML=`<div class="card"><h3>Dashboard SGI</h3></div>`;
 }
 
-async function loadFacturas(){
-const {data}=await client.from("invoices_px")
-.select("id,invoice_number,status");
+//////////////////////////////////////////////////////
+//  MÓDULO CONTRATO / PO
+//////////////////////////////////////////////////////
+
+async function loadContratos(){
+
+const {data: contratos}=await client
+.from("contracts")
+.select("*");
 
 let rows="";
-data.forEach(f=>{
+
+for(const c of contratos){
+
+const totalFacturado=await calcularTotalFacturado(c.id);
+const diferencia=Number(c.total_amount||0)-totalFacturado;
+
 rows+=`<tr>
-<td>${f.invoice_number || "-"}</td>
-<td>${f.status}</td>
-<td><button onclick="openFactura('${f.id}')">Abrir</button></td>
+<td>${c.contract_number||"-"}</td>
+<td>${c.description||"-"}</td>
+<td>${c.total_amount||0}</td>
+<td>${totalFacturado}</td>
+<td class="highlight">${diferencia}</td>
+<td><button onclick="editarContrato('${c.id}')">Editar</button></td>
+<td><button onclick="verFacturasContrato('${c.id}')">Facturas</button></td>
 </tr>`;
-});
-
-contentArea.innerHTML=`<div class="card">
-<h3>Facturas PX</h3>
-<table>
-<tr><th>Número</th><th>Estado</th><th></th></tr>
-${rows}
-</table>
-</div>`;
-}
-
-async function openFactura(invoiceId){
-
-const { data: factura } = await client
-.from("invoices_px")
-.select("*")
-.eq("id", invoiceId)
-.single();
-
-const { data: items } = await client
-.from("invoice_items")
-.select("descripcion,cantidad,valor_total")
-.eq("invoice_id", invoiceId);
-
-renderFacturaVista(factura, items);
-}
-
-function renderFacturaVista(factura, items){
-
-let totalItems = 0;
-if(items){
-items.forEach(i=> totalItems += Number(i.valor_total || 0));
-}
-
-const totalFactura =
-totalItems +
-Number(factura.freight || 0) +
-Number(factura.insurance || 0) +
-Number(factura.others || 0);
-
-let rows="";
-if(items && items.length>0){
-items.forEach(i=>{
-rows+=`<tr>
-<td>${i.descripcion}</td>
-<td>${i.cantidad}</td>
-<td>${i.valor_total}</td>
-</tr>`;
-});
-}else{
-rows=`<tr><td colspan="3">Sin ítems</td></tr>`;
 }
 
 contentArea.innerHTML=`
 <div class="card">
-<h3>Factura PX</h3>
+<h3>Contrato / PO</h3>
 
-<h4>Encabezado</h4>
+<h4>Nuevo Contrato</h4>
+<input type="text" id="new_contract_number" placeholder="Número contrato / provisional">
+<input type="text" id="new_description" placeholder="Descripción">
+<input type="number" id="new_total_amount" placeholder="Monto total contrato">
 
-<label>Número Factura</label>
-<input type="text" id="invoice_number" value="${factura.invoice_number || ""}" disabled>
-
-<label>Fecha Factura</label>
-<input type="date" id="fecha_factura" value="${factura.fecha_factura || ""}" disabled>
-
-<label>Fecha Embarque</label>
-<input type="date" id="fecha_embarque" value="${factura.fecha_embarque || ""}" disabled>
-
-<label>BL</label>
-<input type="text" id="bl_number" value="${factura.bl_number || ""}" disabled>
-
-<label>Freight</label>
-<input type="number" id="freight" value="${factura.freight || 0}" disabled>
-
-<label>Insurance</label>
-<input type="number" id="insurance" value="${factura.insurance || 0}" disabled>
-
-<label>Others</label>
-<input type="number" id="others" value="${factura.others || 0}" disabled>
+<button onclick="crearContrato()">Crear</button>
 
 <hr>
 
-<h4>Detalle</h4>
+<table>
+<tr>
+<th>Número</th>
+<th>Descripción</th>
+<th>Monto Contrato</th>
+<th>Total Facturado</th>
+<th>Diferencia</th>
+<th></th>
+<th></th>
+</tr>
+${rows}
+</table>
+</div>`;
+}
+
+async function crearContrato(){
+
+await client.from("contracts").insert({
+contract_number: document.getElementById("new_contract_number").value,
+description: document.getElementById("new_description").value,
+total_amount: Number(document.getElementById("new_total_amount").value||0)
+});
+
+loadContratos();
+}
+
+async function editarContrato(id){
+
+const {data:c}=await client
+.from("contracts")
+.select("*")
+.eq("id",id)
+.single();
+
+contentArea.innerHTML=`
+<div class="card">
+<h3>Editar Contrato / PO</h3>
+
+<label>Número</label>
+<input type="text" id="edit_contract_number" value="${c.contract_number||""}">
+
+<label>Descripción</label>
+<input type="text" id="edit_description" value="${c.description||""}">
+
+<label>Monto Total</label>
+<input type="number" id="edit_total_amount" value="${c.total_amount||0}">
+
+<button onclick="guardarContrato('${id}')">Guardar</button>
+<button onclick="loadContratos()">Cancelar</button>
+
+</div>`;
+}
+
+async function guardarContrato(id){
+
+await client.from("contracts").update({
+contract_number: document.getElementById("edit_contract_number").value,
+description: document.getElementById("edit_description").value,
+total_amount: Number(document.getElementById("edit_total_amount").value||0)
+}).eq("id",id);
+
+loadContratos();
+}
+
+async function verFacturasContrato(contractId){
+
+const {data:facturas}=await client
+.from("invoices_px")
+.select("*")
+.eq("contract_id",contractId);
+
+let rows="";
+
+for(const f of facturas){
+
+const totalFactura=await calcularTotalFactura(f.id);
+
+rows+=`<tr>
+<td>${f.invoice_number||"-"}</td>
+<td>${totalFactura}</td>
+</tr>`;
+}
+
+contentArea.innerHTML=`
+<div class="card">
+<h3>Facturas Asociadas</h3>
 
 <table>
 <tr>
-<th>Descripción</th>
-<th>Cantidad</th>
-<th>Valor Total</th>
+<th>Número Factura</th>
+<th>Total Factura</th>
 </tr>
 ${rows}
 </table>
 
-<hr>
-
-<h4>Total Ítems: ${totalItems}</h4>
-<h3>Total Factura: ${totalFactura}</h3>
-
-<button onclick="activarEdicion('${factura.id}')">Editar</button>
-
+<button onclick="loadContratos()">Volver</button>
 </div>`;
 }
 
-function activarEdicion(invoiceId){
+//////////////////////////////////////////////////////
+//  CÁLCULOS DINÁMICOS
+//////////////////////////////////////////////////////
 
-document.getElementById("invoice_number").disabled=false;
-document.getElementById("fecha_factura").disabled=false;
-document.getElementById("fecha_embarque").disabled=false;
-document.getElementById("bl_number").disabled=false;
-document.getElementById("freight").disabled=false;
-document.getElementById("insurance").disabled=false;
-document.getElementById("others").disabled=false;
+async function calcularTotalFactura(invoiceId){
 
-const botones = `
-<button onclick="guardarFactura('${invoiceId}')">Guardar Todo</button>
-<button onclick="openFactura('${invoiceId}')">Cancelar</button>
-`;
+const {data:factura}=await client
+.from("invoices_px")
+.select("freight,insurance,others")
+.eq("id",invoiceId)
+.single();
 
-document.querySelector(".card").insertAdjacentHTML("beforeend", botones);
+const {data:items}=await client
+.from("invoice_items")
+.select("valor_total")
+.eq("invoice_id",invoiceId);
+
+let totalItems=0;
+items.forEach(i=> totalItems+=Number(i.valor_total||0));
+
+return totalItems+
+Number(factura.freight||0)+
+Number(factura.insurance||0)+
+Number(factura.others||0);
 }
 
-async function guardarFactura(invoiceId){
+async function calcularTotalFacturado(contractId){
 
-await client.from("invoices_px").update({
-invoice_number: document.getElementById("invoice_number").value,
-fecha_factura: document.getElementById("fecha_factura").value,
-fecha_embarque: document.getElementById("fecha_embarque").value,
-bl_number: document.getElementById("bl_number").value,
-freight: Number(document.getElementById("freight").value),
-insurance: Number(document.getElementById("insurance").value),
-others: Number(document.getElementById("others").value)
-}).eq("id", invoiceId);
+const {data:facturas}=await client
+.from("invoices_px")
+.select("id")
+.eq("contract_id",contractId);
 
-alert("Factura actualizada correctamente");
+let total=0;
 
-openFactura(invoiceId);
+for(const f of facturas){
+total+=await calcularTotalFactura(f.id);
+}
+
+return total;
+}
+
+//////////////////////////////////////////////////////
+
+async function loadFacturas(){
+contentArea.innerHTML=`<div class="card"><h3>Facturas PX</h3><p>Ir al módulo Facturas existente.</p></div>`;
 }
 
 async function loadSubpartidas(){
-const {data}=await client.from("subpartidas")
-.select("codigo_subpartida,descripcion,porcentaje_isd,estado")
-.limit(50);
-
-let rows="";
-data.forEach(s=>{
-rows+=`<tr>
-<td>${s.codigo_subpartida}</td>
-<td>${s.descripcion}</td>
-<td>${s.porcentaje_isd}%</td>
-<td>${s.estado}</td>
-</tr>`;
-});
-
-contentArea.innerHTML=`<div class="card">
-<h3>Subpartidas ISD</h3>
-<table>
-<tr><th>Código</th><th>Descripción</th><th>% ISD</th><th>Estado</th></tr>
-${rows}
-</table>
-</div>`;
+contentArea.innerHTML=`<div class="card"><h3>Subpartidas ISD</h3></div>`;
 }
 
 loadApp();
