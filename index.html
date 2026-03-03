@@ -9,6 +9,7 @@
 body{margin:0;font-family:Arial;background:#F5F6F8;}
 .layout{display:none;height:100vh;}
 .sidebar{width:260px;background:#1F2937;color:white;padding:20px;}
+.sidebar h3{margin-top:0;}
 .sidebar div{margin:10px 0;cursor:pointer;}
 .sidebar div:hover{color:#60A5FA;}
 .main{flex:1;display:flex;flex-direction:column;}
@@ -16,11 +17,12 @@ body{margin:0;font-family:Arial;background:#F5F6F8;}
 .content{padding:20px;overflow:auto;}
 .card{background:white;padding:20px;border-radius:6px;margin-bottom:20px;}
 input,select{padding:6px;margin-bottom:8px;width:100%;}
-button{padding:6px 10px;background:#1D4ED8;color:white;border:none;border-radius:4px;cursor:pointer;margin-top:6px;}
+button{padding:6px 10px;background:#1D4ED8;color:white;border:none;border-radius:4px;cursor:pointer;margin-top:6px;margin-right:4px;}
 button.delete{background:#DC2626;}
 table{width:100%;border-collapse:collapse;margin-top:10px;}
 th,td{padding:6px;border-bottom:1px solid #e5e7eb;text-align:left;}
 .total{font-weight:bold;}
+hr{margin:15px 0;}
 </style>
 </head>
 
@@ -58,12 +60,18 @@ const client=supabase.createClient(
 );
 
 async function login(){
-const {error}=await client.auth.signInWithPassword({email:email.value,password:password.value});
+const {error}=await client.auth.signInWithPassword({
+email:email.value,
+password:password.value
+});
 if(error){loginMessage.innerText=error.message;return;}
 loadApp();
 }
 
-async function logout(){await client.auth.signOut();location.reload();}
+async function logout(){
+await client.auth.signOut();
+location.reload();
+}
 
 async function loadApp(){
 const {data}=await client.auth.getSession();
@@ -87,8 +95,11 @@ const {data}=await client.from("suppliers").select("*");
 
 let rows="";
 data.forEach(s=>{
-rows+=`<tr><td>${s.supplier_name}</td>
-<td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td></tr>`;
+rows+=`
+<tr>
+<td>${s.supplier_name}</td>
+<td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td>
+</tr>`;
 });
 
 contentArea.innerHTML=`
@@ -96,12 +107,17 @@ contentArea.innerHTML=`
 <h3>Proveedores</h3>
 <input id="new_supplier" placeholder="Nombre proveedor">
 <button onclick="createSupplier()">Crear</button>
-<table><tr><th>Proveedor</th><th></th></tr>${rows}</table>
+<table>
+<tr><th>Proveedor</th><th></th></tr>
+${rows}
+</table>
 </div>`;
 }
 
 async function createSupplier(){
-await client.from("suppliers").insert({supplier_name:new_supplier.value});
+await client.from("suppliers").insert({
+supplier_name:new_supplier.value
+});
 loadSuppliers();
 }
 
@@ -115,37 +131,51 @@ loadSuppliers();
 //////////////////////////////////////////////////////////
 
 async function loadContratos(){
-const {data}=await client.from("contracts")
-.select("id,contract_number,total_amount,suppliers(supplier_name)");
+
+const {data}=await client
+.from("contracts")
+.select("id,contract_number,total_amount,supplier_id,suppliers(supplier_name)");
 
 let rows="";
 data.forEach(c=>{
-rows+=`<tr>
+rows+=`
+<tr>
 <td>${c.contract_number}</td>
 <td>${c.suppliers?.supplier_name||"-"}</td>
 <td>${c.total_amount||0}</td>
+<td>
+<button onclick="editarContrato('${c.id}')">Editar</button>
+<button class="delete" onclick="eliminarContrato('${c.id}')">Eliminar</button>
+</td>
 </tr>`;
 });
 
 contentArea.innerHTML=`
 <div class="card">
 <h3>Contrato / PO</h3>
+
 <input id="new_contract" placeholder="Número contrato">
 <select id="supplier_select"></select>
 <input id="new_amount" type="number" placeholder="Monto">
 <button onclick="createContract()">Crear</button>
+
 <table>
-<tr><th>Número</th><th>Proveedor</th><th>Monto</th></tr>
+<tr>
+<th>Número</th>
+<th>Proveedor</th>
+<th>Monto</th>
+<th></th>
+</tr>
 ${rows}
 </table>
 </div>`;
 
-loadSupplierSelect();
+loadSupplierSelect("supplier_select");
 }
 
-async function loadSupplierSelect(){
+async function loadSupplierSelect(selectId){
 const {data}=await client.from("suppliers").select("id,supplier_name");
-let select=document.getElementById("supplier_select");
+let select=document.getElementById(selectId);
 select.innerHTML="<option value=''>Seleccionar proveedor</option>";
 data.forEach(s=>{
 select.innerHTML+=`<option value="${s.id}">${s.supplier_name}</option>`;
@@ -161,17 +191,59 @@ total_amount:Number(new_amount.value||0)
 loadContratos();
 }
 
+async function editarContrato(id){
+const {data}=await client.from("contracts").select("*").eq("id",id).single();
+
+contentArea.innerHTML=`
+<div class="card">
+<h3>Editar Contrato</h3>
+<input id="edit_contract_number" value="${data.contract_number}">
+<select id="edit_supplier"></select>
+<input id="edit_amount" type="number" value="${data.total_amount||0}">
+<button onclick="guardarContrato('${id}')">Guardar</button>
+<button onclick="loadContratos()">Cancelar</button>
+</div>`;
+
+await loadSupplierSelect("edit_supplier");
+document.getElementById("edit_supplier").value=data.supplier_id||"";
+}
+
+async function guardarContrato(id){
+await client.from("contracts").update({
+contract_number:edit_contract_number.value,
+supplier_id:edit_supplier.value||null,
+total_amount:Number(edit_amount.value||0)
+}).eq("id",id);
+loadContratos();
+}
+
+async function eliminarContrato(id){
+if(!confirm("¿Seguro que desea eliminar este contrato?")) return;
+
+const {error}=await client.from("contracts").delete().eq("id",id);
+
+if(error){
+alert("No se puede eliminar. Puede tener facturas asociadas.");
+return;
+}
+
+loadContratos();
+}
+
 //////////////////////////////////////////////////////////
-// FACTURAS COMPLETAS EN UNA SOLA PANTALLA
+// FACTURAS (Cabecera + Ítems)
 //////////////////////////////////////////////////////////
 
 async function loadFacturas(){
-const {data}=await client.from("invoices_px")
-.select("id,invoice_number,freight,insurance,others,contracts(contract_number)");
+
+const {data}=await client
+.from("invoices_px")
+.select("id,invoice_number,contracts(contract_number)");
 
 let rows="";
 data.forEach(f=>{
-rows+=`<tr>
+rows+=`
+<tr>
 <td>${f.invoice_number}</td>
 <td>${f.contracts?.contract_number||"Sin contrato"}</td>
 <td><button onclick="openFactura('${f.id}')">Abrir</button></td>
@@ -183,6 +255,7 @@ contentArea.innerHTML=`
 <h3>Facturas PX</h3>
 <input id="new_invoice" placeholder="Número factura">
 <button onclick="createFactura()">Crear</button>
+
 <table>
 <tr><th>Número</th><th>Contrato</th><th></th></tr>
 ${rows}
@@ -199,18 +272,24 @@ loadFacturas();
 
 async function openFactura(id){
 
-const {data:factura}=await client.from("invoices_px")
-.select("*").eq("id",id).single();
+const {data:factura}=await client
+.from("invoices_px")
+.select("*")
+.eq("id",id)
+.single();
 
-const {data:items}=await client.from("invoice_items")
+const {data:items}=await client
+.from("invoice_items")
 .select("id,descripcion,cantidad,valor_total")
 .eq("invoice_id",id);
 
 let rows="";
 let total=0;
+
 items.forEach(i=>{
 total+=Number(i.valor_total);
-rows+=`<tr>
+rows+=`
+<tr>
 <td>${i.descripcion}</td>
 <td>${i.cantidad}</td>
 <td>${i.valor_total}</td>
@@ -222,9 +301,9 @@ contentArea.innerHTML=`
 <h3>Factura</h3>
 
 <input id="f_invoice" value="${factura.invoice_number}">
-<input type="number" id="f_freight" value="${factura.freight||0}">
-<input type="number" id="f_insurance" value="${factura.insurance||0}">
-<input type="number" id="f_others" value="${factura.others||0}">
+<input type="number" id="f_freight" value="${factura.freight||0}" placeholder="Freight">
+<input type="number" id="f_insurance" value="${factura.insurance||0}" placeholder="Insurance">
+<input type="number" id="f_others" value="${factura.others||0}" placeholder="Others">
 
 <hr>
 
@@ -248,9 +327,11 @@ loadSubpartidasSelect();
 }
 
 async function loadSubpartidasSelect(){
-const {data}=await client.from("subpartidas")
+const {data}=await client
+.from("subpartidas")
 .select("id,codigo_subpartida")
-.eq("estado","ACTIVA").limit(50);
+.eq("estado","ACTIVA")
+.limit(50);
 
 let select=document.getElementById("subpartida_select");
 select.innerHTML="";
@@ -260,6 +341,7 @@ select.innerHTML+=`<option value="${s.id}">${s.codigo_subpartida}</option>`;
 }
 
 async function addItem(invoiceId){
+
 let qty=Number(item_qty.value);
 let total=Number(item_total.value);
 
