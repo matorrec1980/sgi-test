@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>SGI</title>
+<title>SGI - Sistema de Gestión de Importaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
@@ -20,7 +20,7 @@ button{padding:6px 10px;background:#1D4ED8;color:white;border:none;border-radius
 button.delete{background:#DC2626}
 table{width:100%;border-collapse:collapse;margin-top:10px}
 th,td{padding:6px;border-bottom:1px solid #e5e7eb;text-align:left}
-textarea{height:140px}
+textarea{height:160px}
 </style>
 </head>
 
@@ -59,7 +59,6 @@ const client = supabase.createClient(
 "sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W"
 )
 
-// SESSION
 document.addEventListener("DOMContentLoaded", async ()=>{
 const {data}=await client.auth.getSession()
 if(data.session){
@@ -87,12 +86,10 @@ await client.auth.signOut()
 location.reload()
 }
 
-// DASHBOARD
 function loadDashboard(){
-contentArea.innerHTML=`<div class="card"><h3>Dashboard</h3>SGI funcionando</div>`
+contentArea.innerHTML='<div class="card"><h3>Dashboard</h3>Sistema SGI activo</div>'
 }
 
-// PROVEEDORES
 async function loadSuppliers(){
 const {data}=await client.from("suppliers").select("*")
 let rows=""
@@ -124,7 +121,6 @@ await client.from("suppliers").delete().eq("id",id)
 loadSuppliers()
 }
 
-// CONTRATOS
 async function loadContratos(){
 const {data}=await client
 .from("contracts")
@@ -183,7 +179,6 @@ await client.from("contracts").delete().eq("id",id)
 loadContratos()
 }
 
-// FACTURAS
 async function loadFacturas(){
 const {data}=await client
 .from("invoices_px")
@@ -220,7 +215,9 @@ ${rows}
 }
 
 async function createFactura(){
-await client.from("invoices_px").insert({invoice_number:invoice_number.value})
+await client.from("invoices_px").insert({
+invoice_number:invoice_number.value
+})
 loadFacturas()
 }
 
@@ -229,7 +226,6 @@ await client.from("invoices_px").delete().eq("id",id)
 loadFacturas()
 }
 
-// DETALLE FACTURA
 async function openFactura(id){
 
 const {data:factura}=await client
@@ -265,24 +261,14 @@ contentArea.innerHTML=`
 <label>Número factura</label>
 <input id="f_invoice" value="${factura.invoice_number||""}">
 
-<label>Freight</label>
-<input id="f_freight" value="${factura.freight||0}">
-
-<label>Insurance</label>
-<input id="f_insurance" value="${factura.insurance||0}">
-
-<label>Others</label>
-<input id="f_others" value="${factura.others||0}">
-
-<button onclick="saveHeader('${id}')">Guardar Cabecera</button>
+<button onclick="saveHeader('${id}')">Guardar</button>
 
 <hr>
 
-<h4>Importar desde Excel</h4>
+<h4>Pegar desde Excel</h4>
+<textarea id="excel_data" placeholder="Pegue desde Excel"></textarea>
 
-<textarea id="excel_data" placeholder="Pegar desde Excel"></textarea>
-
-<button onclick="importExcel('${id}')">Importar Items</button>
+<button onclick="importExcel('${id}')">Importar</button>
 
 <table>
 <tr>
@@ -311,43 +297,49 @@ ${rows}
 
 async function saveHeader(id){
 await client.from("invoices_px").update({
-invoice_number:f_invoice.value,
-freight:f_freight.value,
-insurance:f_insurance.value,
-others:f_others.value
+invoice_number:f_invoice.value
 }).eq("id",id)
-alert("Cabecera guardada")
+alert("Guardado")
 }
 
-// IMPORT EXCEL
 async function importExcel(invoiceId){
 
-let text=excel_data.value.trim()
-let lines=text.split("\n")
+let text = excel_data.value.trim()
 
-for(let l of lines){
+if(!text){
+alert("No hay datos pegados")
+return
+}
 
-let cols=l.split("\t")
+let lines = text.split("\n")
 
-let descripcion=cols[0]
-let specification=cols[1]
-let unit=cols[2]
-let cantidad=Number(cols[3])
-let precio=Number(cols[4])
-let total=Number(cols[5])
-let codigo=cols[6]
+for(const line of lines){
 
-let subpartida_id=null
+if(!line.trim()) continue
+
+let cols = line.split("\t")
+
+if(cols.length < 6) continue
+
+let descripcion = cols[0]
+let specification = cols[1]
+let unit = cols[2]
+let cantidad = Number(cols[3])
+let precio = Number(cols[4])
+let total = Number(cols[5])
+let codigo = cols[6] || null
+
+let subpartida_id = null
 
 if(codigo){
-let {data}=await client
+let {data} = await client
 .from("subpartidas")
 .select("id")
 .eq("codigo_subpartida",codigo)
 .limit(1)
 
-if(data.length>0){
-subpartida_id=data[0].id
+if(data && data.length>0){
+subpartida_id = data[0].id
 }
 }
 
@@ -361,7 +353,10 @@ cantidad:cantidad,
 precio_unitario:precio,
 valor_total:total
 })
+
 }
+
+alert("Items importados")
 
 openFactura(invoiceId)
 }
