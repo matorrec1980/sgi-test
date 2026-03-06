@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <title>SGI v10 - Sistema de Gestión de Importaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 body{margin:0;font-family:Arial;background:#f4f6f9}
 .sidebar{width:230px;background:#1f2937;color:white;height:100vh;padding:20px;position:fixed}
@@ -18,7 +19,7 @@ button{padding:5px 10px;border:none;border-radius:4px;color:white;cursor:pointer
 .btn{background:#2563eb}
 .delete{background:#dc2626}
 .edit{background:#059669}
-input,select{padding:6px;font-size:13px;width:100%}
+input,select,textarea{padding:6px;font-size:13px;width:100%}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
 </style>
@@ -49,9 +50,9 @@ function dashboard(){
 app.innerHTML=`
 <div class="card">
 <h3>Dashboard</h3>
-<p>Subpartidas 0% : ---</p>
-<p>Subpartidas 2.5% : ---</p>
-<p>Total subpartidas : ---</p>
+<p>Subpartidas 0% : --</p>
+<p>Subpartidas 2.5% : --</p>
+<p>Total subpartidas : --</p>
 </div>`
 }
 
@@ -59,10 +60,24 @@ function proveedores(){
 app.innerHTML=`
 <div class="card">
 <h3>Proveedores</h3>
-<input placeholder="Proveedor">
-<button class="btn">Crear</button>
+
+<input placeholder="Nombre proveedor">
+<button class="btn">Crear proveedor</button>
+
 <table>
-<tr><th>Proveedor</th><th></th></tr>
+<tr>
+<th>Proveedor</th>
+<th>Acciones</th>
+</tr>
+
+<tr>
+<td>Proveedor Demo</td>
+<td>
+<button class="edit">Editar</button>
+<button class="delete">Eliminar</button>
+</td>
+</tr>
+
 </table>
 </div>`
 }
@@ -70,37 +85,49 @@ app.innerHTML=`
 function contratos(){
 app.innerHTML=`
 <div class="card">
-<h3>Contratos</h3>
+<h3>Contratos / PO</h3>
+
+<div class="grid3">
 <input placeholder="Número contrato">
+<input placeholder="Proveedor">
 <input placeholder="Monto contrato">
-<button class="btn">Crear</button>
+</div>
+
+<button class="btn">Crear contrato</button>
+
 <table>
+
 <tr>
 <th>Contrato</th>
+<th>Proveedor</th>
 <th>Monto</th>
 <th>Acciones</th>
 </tr>
+
 <tr>
 <td>CT-001</td>
+<td>Proveedor Demo</td>
 <td>${money(100000)}</td>
 <td>
 <button class="edit">Editar</button>
 <button class="delete">Eliminar</button>
 </td>
 </tr>
+
 </table>
 </div>`
 }
 
 function facturas(){
 app.innerHTML=`
+
 <div class="card">
 
-<h3>Factura</h3>
+<h3>Factura PX</h3>
 
 <div class="grid3">
 <label>Fecha factura<input type="date"></label>
-<label>Número factura<input></label>
+<label>N° factura<input></label>
 <label>Contrato<select>
 <option>Por asignar</option>
 <option>CT-001</option>
@@ -121,9 +148,12 @@ app.innerHTML=`
 
 <button class="btn">Guardar cabecera</button>
 
-<h4>Items</h4>
+<h4>Importar items desde Excel</h4>
+<textarea placeholder="Pegar tabla de Excel aquí"></textarea>
+<button class="btn">Importar Excel</button>
 
 <table>
+
 <tr>
 <th>Descripción</th>
 <th>Spec</th>
@@ -134,12 +164,12 @@ app.innerHTML=`
 <th>Subpartida</th>
 <th>ISD %</th>
 <th>ISD</th>
-<th></th>
+<th>Acciones</th>
 </tr>
 
 <tr>
 <td>Producto demo</td>
-<td>ZX001</td>
+<td>ZX118</td>
 <td>PC</td>
 <td>10</td>
 <td>${money(50)}</td>
@@ -154,12 +184,12 @@ app.innerHTML=`
 </tr>
 
 <tr>
-<td colspan="5">Subtotal</td>
+<td colspan="5"><b>Subtotal</b></td>
 <td>${money(500)}</td>
 </tr>
 
 <tr>
-<td colspan="5">Total factura</td>
+<td colspan="5"><b>Total factura</b></td>
 <td>${money(550)}</td>
 </tr>
 
@@ -172,21 +202,33 @@ function subpartidas(){
 app.innerHTML=`
 <div class="card">
 <h3>Subpartidas ISD</h3>
-<p>Subpartidas 0%: ---</p>
-<p>Subpartidas 2.5%: ---</p>
-<p>Total subpartidas: ---</p>
+
+<p>Total subpartidas: --</p>
+<p>Subpartidas 0%: --</p>
+<p>Subpartidas 2.5%: --</p>
+
 <table>
+
 <tr>
 <th>Subpartida</th>
 <th>Descripción</th>
 <th>ISD %</th>
 </tr>
+
+<tr>
+<td>8474900000</td>
+<td>Partes de maquinaria</td>
+<td>2.5</td>
+</tr>
+
 </table>
+
 </div>`
 }
 
 dashboard()
 
 </script>
+
 </body>
 </html>
