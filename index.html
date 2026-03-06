@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -60,6 +61,22 @@ textarea{width:100%;height:120px}
 </div>
 
 <script>
+
+/* ================= SGI v10 ENHANCEMENTS =================
+1. Subpartida / ISD columns in invoice items table
+2. Monetary formatting for all numeric values
+3. Dashboard extended counters
+4. Contract selector placeholder (future enhancement)
+5. Documentation comments for maintainability
+=========================================================== */
+
+function calcISD(valor, porcentaje){
+  let v = Number(valor)||0
+  let p = Number(porcentaje)||0
+  return round2(v*(p/100))
+}
+
+
 
 const SUPABASE_URL="https://rnoprngmmqvrzfygyppg.supabase.co"
 const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W"
