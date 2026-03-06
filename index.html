@@ -4,28 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <title>SGI - Sistema de Gestión de Importaciones</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-
-// ---- PATCH v10.3 header autosave ----
-async function saveFacturaHeader(){
- if(!currentInvoice) return
- const f={}
- const map=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
- map.forEach(id=>{
-   const el=document.getElementById(id)
-   if(el) f[id]=el.value
- })
- try{
-   await client.from("invoices_px").update(f).eq("id",currentInvoice.id)
- }catch(e){console.log(e)}
-}
-
-document.addEventListener("change",e=>{
- const ids=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
- if(ids.includes(e.target.id)) saveFacturaHeader()
-})
-
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 body{margin:0;font-family:Arial;background:#F5F6F8}
@@ -198,8 +177,35 @@ contentArea.innerHTML=`
 </div>`
 }
 
+
 async function createFactura(){
-await client.from("invoices_px").insert({invoice_number:newInvoice.value})
+
+ const numero=document.getElementById("newInvoice").value
+
+ if(!numero){
+  alert("Ingrese número de factura")
+  return
+ }
+
+ const {data,error}=await client
+ .from("invoices_px")
+ .insert({
+   invoice_number:numero
+ })
+ .select()
+ .single()
+
+ if(error){
+  alert(error.message)
+  return
+ }
+
+ document.getElementById("newInvoice").value=""
+
+ loadFacturas()
+
+}
+)
 loadFacturas()
 }
 
@@ -381,27 +387,6 @@ ${rows}
 function nextPage(){page++;loadSubpartidas()}
 function prevPage(){if(page>0)page--;loadSubpartidas()}
 
-
-
-// ---- PATCH v10.3 header autosave ----
-async function saveFacturaHeader(){
- if(!currentInvoice) return
- const f={}
- const map=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
- map.forEach(id=>{
-   const el=document.getElementById(id)
-   if(el) f[id]=el.value
- })
- try{
-   await client.from("invoices_px").update(f).eq("id",currentInvoice.id)
- }catch(e){console.log(e)}
-}
-
-document.addEventListener("change",e=>{
- const ids=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
- if(ids.includes(e.target.id)) saveFacturaHeader()
-})
-
 </script>
 
 
@@ -438,27 +423,6 @@ function calcFacturaTotal(subtotal,freight,insurance,others){
   + Number(others||0)
  );
 }
-
-
-
-// ---- PATCH v10.3 header autosave ----
-async function saveFacturaHeader(){
- if(!currentInvoice) return
- const f={}
- const map=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
- map.forEach(id=>{
-   const el=document.getElementById(id)
-   if(el) f[id]=el.value
- })
- try{
-   await client.from("invoices_px").update(f).eq("id",currentInvoice.id)
- }catch(e){console.log(e)}
-}
-
-document.addEventListener("change",e=>{
- const ids=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
- if(ids.includes(e.target.id)) saveFacturaHeader()
-})
 
 </script>
 
