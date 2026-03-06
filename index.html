@@ -198,15 +198,48 @@ contentArea.innerHTML=`
 </div>`
 }
 
+
 async function createFactura(){
-await client.from("invoices_px").insert({invoice_number:newInvoice.value})
-loadFacturas()
+
+ const {data,error}=await client
+ .from("invoices_px")
+ .insert({invoice_number:"BORRADOR"})
+ .select()
+ .single()
+
+ if(error){
+  alert(error.message)
+  return
+ }
+
+ openFactura(data.id)
+
 }
+
 
 async function deleteFactura(id){
 await client.from("invoices_px").delete().eq("id",id)
 loadFacturas()
 }
+
+
+async function loadContractSelect(selected){
+
+ const {data}=await client
+ .from("contracts")
+ .select("id,contract_number")
+ .order("contract_number")
+
+ let html='<option value="">POR ASIGNAR</option>'
+
+ data.forEach(c=>{
+  html+=`<option value="${c.id}" ${selected==c.id?"selected":""}>${c.contract_number}</option>`
+ })
+
+ document.getElementById("contract_id").innerHTML=html
+
+}
+
 
 async function openFactura(id){
 currentInvoice=id
@@ -245,7 +278,7 @@ contentArea.innerHTML=`
 <div class="row3">
 <input id="fecha_factura" type="date" value="${factura.fecha_factura||""}">
 <input id="invoice_number" value="${factura.invoice_number||""}">
-<input id="contract_id" value="${factura.contract_id||""}" placeholder="Contrato">
+<select id="contract_id"></select>
 </div>
 
 <div class="row2">
@@ -259,7 +292,10 @@ contentArea.innerHTML=`
 <input id="others" value="${others}">
 </div>
 
-<button class="btn" onclick="saveHeader()">Guardar Cabecera</button>
+<button class="btn" onclick="saveHeader()">Guardar Cabecera</button>`
+
+loadContractSelect(factura.contract_id)
+contentArea.innerHTML+=`
 
 </div>
 
