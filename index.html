@@ -499,10 +499,14 @@ document.addEventListener("change",e=>{
 </script>
 
 
-<!-- =============================== -->
-<!-- SGI v10.6 EXTENSION (FACTURAS) -->
-<!-- =============================== -->
+<!-- ===================================================== -->
+<!-- SGI v10.7 EXTENSION – ISD CALCULATION + ITEM LOGIC   -->
+<!-- Mantiene el mismo diseño visual de la tabla actual   -->
+<!-- ===================================================== -->
+
 <script>
+
+/* ---------- UTILIDADES FINANCIERAS ---------- */
 
 function round2(v){
  return Math.round((Number(v)+Number.EPSILON)*100)/100
@@ -515,30 +519,50 @@ function money(v){
  })
 }
 
+/* ---------- PRECIO UNITARIO ---------- */
+
 function calcPrecioUnitario(valor_total,cantidad){
  if(!cantidad || cantidad==0) return 0
  return round2(Number(valor_total)/Number(cantidad))
 }
 
+/* ---------- ISD ---------- */
+
 function calcISDPercent(codigo,subpartidas){
- if(!codigo || codigo.trim()==="") return 5
- if(!subpartidas) return 5
- const found = subpartidas.find(s=>s.codigo_subpartida===codigo)
- if(found) return Number(found.porcentaje_isd)
+
+ if(!codigo || codigo.trim()==="")
+  return 5
+
+ if(!subpartidas)
+  return 5
+
+ const found = subpartidas.find(
+  s=>String(s.codigo_subpartida)===String(codigo)
+ )
+
+ if(found)
+  return Number(found.porcentaje_isd)
+
  return 5
+
 }
 
 function calcISDValor(valor_total,percent){
  return round2(Number(valor_total)*(Number(percent)/100))
 }
 
+/* ---------- CALCULO ITEM ---------- */
+
 function calcularItem(item,subpartidas){
 
- let precio_unitario = calcPrecioUnitario(item.valor_total,item.cantidad)
+ const precio_unitario =
+  calcPrecioUnitario(item.valor_total,item.cantidad)
 
- let percent = calcISDPercent(item.codigo_subpartida,subpartidas)
+ const percent =
+  calcISDPercent(item.codigo_subpartida,subpartidas)
 
- let isd = calcISDValor(item.valor_total,percent)
+ const isd =
+  calcISDValor(item.valor_total,percent)
 
  return {
   ...item,
@@ -548,6 +572,8 @@ function calcularItem(item,subpartidas){
  }
 
 }
+
+/* ---------- TOTAL FACTURA ---------- */
 
 function calcularTotalFactura(items,freight,insurance,others){
 
@@ -559,7 +585,7 @@ function calcularTotalFactura(items,freight,insurance,others){
 
  subtotal = round2(subtotal)
 
- let total = round2(
+ const total = round2(
   subtotal +
   Number(freight||0) +
   Number(insurance||0) +
@@ -576,39 +602,13 @@ function calcularTotalFactura(items,freight,insurance,others){
 
 }
 
-function renderItemsFactura(items,subpartidas){
-
- let rows=""
-
- items.forEach(i=>{
-
-  let calc = calcularItem(i,subpartidas)
-
-  rows += `
-  <tr>
-   <td>${calc.descripcion||""}</td>
-   <td>${calc.specification||""}</td>
-   <td>${calc.unit||""}</td>
-   <td>${calc.cantidad}</td>
-   <td>${money(calc.valor_total)}</td>
-   <td>${money(calc.precio_unitario)}</td>
-   <td>${calc.codigo_subpartida||""}</td>
-   <td>${calc.porcentaje_isd}%</td>
-   <td>${money(calc.valor_isd)}</td>
-  </tr>
-  `
-
- })
-
- return rows
-
-}
+/* ---------- IMPORTACION DESDE EXCEL ---------- */
 
 function parseExcelRows(text){
 
  const lines = text.split("\n")
 
- let items=[]
+ const items=[]
 
  lines.forEach(l=>{
 
@@ -632,7 +632,27 @@ function parseExcelRows(text){
 
 }
 
+/* ---------- RENDER DETALLE ISD (SIN CAMBIAR DISEÑO) ---------- */
+
+function renderISDInfo(item,subpartidas){
+
+ const calc = calcularItem(item,subpartidas)
+
+ return `
+ <div style="font-size:12px;color:#555;margin-top:2px">
+  Subpartida: ${calc.codigo_subpartida || "Pendiente"} |
+  ISD %: ${calc.porcentaje_isd}% |
+  ISD: ${money(calc.valor_isd)}
+ </div>
+ `
+
+}
+
 </script>
+
+<!-- ===================================================== -->
+<!-- FIN EXTENSION SGI v10.7                               -->
+<!-- ===================================================== -->
 
 </body>
 
