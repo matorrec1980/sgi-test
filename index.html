@@ -64,6 +64,8 @@ const SUPABASE_URL="https://rnoprngmmqvrzfygyppg.supabase.co";
 const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
 const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
+let currentInvoiceId=null;
+
 document.addEventListener("DOMContentLoaded",async()=>{
 const {data}=await client.auth.getSession();
 if(data.session){
@@ -90,194 +92,13 @@ function loadDashboard(){
 contentArea.innerHTML=`<div class="card"><h3>Dashboard</h3>Sistema SGI activo.</div>`;
 }
 
-/////////////////////// PROVEEDORES
-
-async function loadSuppliers(){
-
-const {data}=await client.from("suppliers").select("*");
-
-let rows="";
-
-data.forEach(s=>{
-rows+=`<tr>
-<td>${s.supplier_name}</td>
-<td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td>
-</tr>`;
-});
-
-contentArea.innerHTML=`
-<div class="card">
-<h3>Proveedores</h3>
-
-<input id="supplier_name" placeholder="Nombre proveedor">
-<button onclick="createSupplier()">Crear proveedor</button>
-
-<table>
-<tr><th>Proveedor</th><th></th></tr>
-${rows}
-</table>
-
-</div>`;
-
-}
-
-async function createSupplier(){
-
-await client.from("suppliers").insert({
-supplier_name:supplier_name.value
-});
-
-loadSuppliers();
-
-}
-
-async function deleteSupplier(id){
-
-await client.from("suppliers").delete().eq("id",id);
-
-loadSuppliers();
-
-}
-
-/////////////////////// CONTRATOS
-
-async function loadContracts(){
-
-const {data}=await client
-.from("contracts")
-.select("id,contract_number,total_amount,suppliers(supplier_name)");
-
-let rows="";
-
-data.forEach(c=>{
-
-rows+=`<tr>
-<td>${c.contract_number}</td>
-<td>${c.suppliers?.supplier_name||"-"}</td>
-<td>${c.total_amount||0}</td>
-<td>
-<button class="delete" onclick="deleteContract('${c.id}')">Eliminar</button>
-</td>
-</tr>`;
-
-});
-
-contentArea.innerHTML=`
-
-<div class="card">
-
-<h3>Contratos / PO</h3>
-
-<input id="contract_number" placeholder="Número contrato">
-<select id="supplier_select"></select>
-<input id="contract_amount" type="number" placeholder="Monto contrato">
-
-<button onclick="createContract()">Crear contrato</button>
-
-<table>
-
-<tr>
-<th>Número</th>
-<th>Proveedor</th>
-<th>Monto</th>
-<th></th>
-</tr>
-
-${rows}
-
-</table>
-
-</div>
-
-`;
-
-loadSupplierSelect();
-
-}
-
-async function loadSupplierSelect(){
-
-const {data}=await client.from("suppliers").select("*");
-
-supplier_select.innerHTML="<option value=''>Sin proveedor</option>";
-
-data.forEach(s=>{
-supplier_select.innerHTML+=`<option value="${s.id}">${s.supplier_name}</option>`;
-});
-
-}
-
-async function createContract(){
-
-await client.from("contracts").insert({
-contract_number:contract_number.value,
-supplier_id:supplier_select.value||null,
-total_amount:contract_amount.value||0
-});
-
-loadContracts();
-
-}
-
-async function deleteContract(id){
-
-await client.from("contracts").delete().eq("id",id);
-
-loadContracts();
-
-}
-
-/////////////////////// SUBPARTIDAS
-
-async function loadSubpartidas(){
-
-const {data}=await client.from("subpartidas").select("*").limit(200);
-
-let rows="";
-
-data.forEach(s=>{
-
-rows+=`<tr>
-<td>${s.codigo_subpartida}</td>
-<td>${s.descripcion||""}</td>
-<td>${s.porcentaje_isd||0}%</td>
-<td>${s.estado}</td>
-</tr>`;
-
-});
-
-contentArea.innerHTML=`
-
-<div class="card">
-
-<h3>Subpartidas ISD</h3>
-
-<table>
-
-<tr>
-<th>Código</th>
-<th>Descripción</th>
-<th>% ISD</th>
-<th>Estado</th>
-</tr>
-
-${rows}
-
-</table>
-
-</div>
-
-`;
-
-}
-
-/////////////////////// FACTURAS
+//////////////////////// FACTURAS
 
 async function loadFacturas(){
 
 const {data}=await client
 .from("invoices_px")
-.select("id,invoice_number,contracts(contract_number,suppliers(supplier_name))");
+.select("id,invoice_number");
 
 let rows="";
 
@@ -285,48 +106,31 @@ data.forEach(f=>{
 
 rows+=`<tr>
 <td>${f.invoice_number}</td>
-<td>${f.contracts?.contract_number||"Sin contrato"}</td>
-<td>${f.contracts?.suppliers?.supplier_name||"-"}</td>
-
 <td>
-
 <button onclick="openFactura('${f.id}')">Abrir</button>
-
 <button class="delete" onclick="deleteFactura('${f.id}')">Eliminar</button>
-
 </td>
-
 </tr>`;
 
 });
 
 contentArea.innerHTML=`
-
 <div class="card">
 
 <h3>Facturas PX</h3>
 
 <input id="invoice_number" placeholder="Número factura">
-
 <button onclick="createFactura()">Crear factura</button>
 
 <table>
-
 <tr>
 <th>Factura</th>
-<th>Contrato</th>
-<th>Proveedor</th>
 <th></th>
 </tr>
-
 ${rows}
-
 </table>
 
-</div>
-
-`;
-
+</div>`;
 }
 
 async function createFactura(){
@@ -337,7 +141,7 @@ invoice_number:invoice_number.value
 
 if(error){alert(error.message);return;}
 
-alert("Factura creada correctamente");
+alert("Factura creada");
 
 loadFacturas();
 
@@ -351,9 +155,11 @@ loadFacturas();
 
 }
 
-/////////////////////// FACTURA DETALLE
+//////////////////////// FACTURA DETALLE
 
 async function openFactura(id){
+
+currentInvoiceId=id;
 
 const {data:factura}=await client
 .from("invoices_px")
@@ -375,19 +181,16 @@ subtotal+=Number(i.valor_total);
 
 rows+=`
 <tr>
-
 <td>${i.descripcion}</td>
 <td>${i.specification||""}</td>
 <td>${i.unit||""}</td>
 <td>${i.cantidad}</td>
 <td>${i.precio_unitario}</td>
 <td>${i.valor_total}</td>
-
 <td>
 <button class="edit" onclick="editItem('${i.id}','${id}')">Editar</button>
 <button class="delete" onclick="deleteItem('${i.id}','${id}')">Eliminar</button>
 </td>
-
 </tr>`;
 
 });
@@ -453,9 +256,9 @@ ${rows}
 
 <button onclick="loadFacturas()">Volver</button>
 
-</div>
+</div>`;
 
-`;
+setTimeout(enablePasteImport,200);
 
 }
 
@@ -471,7 +274,7 @@ alert("Cabecera guardada");
 
 }
 
-/////////////////////// IMPORTAR EXCEL
+//////////////////////// IMPORT EXCEL
 
 async function importExcel(invoiceId){
 
@@ -481,35 +284,83 @@ if(!text){alert("No hay datos");return;}
 
 let lines=text.split("\n");
 
+let rows=[];
+
 for(const line of lines){
 
 let cols=line.split("\t");
 
-if(cols.length<6)continue;
+if(cols.length<6) continue;
 
-await client.from("invoice_items").insert({
+let descripcion=cols[0];
+let specification=cols[1];
+let unit=cols[2];
 
+let cantidad=Number(cols[3].replace(/,/g,""));
+let precio=Number(cols[4].replace(/,/g,""));
+let total=Number(cols[5].replace(/,/g,""));
+
+rows.push({
 invoice_id:invoiceId,
-descripcion:cols[0],
-specification:cols[1],
-unit:cols[2],
-cantidad:Number(cols[3]),
-precio_unitario:Number(cols[4]),
-valor_total:Number(cols[5])
-
+descripcion:descripcion,
+specification:specification,
+unit:unit,
+cantidad:cantidad,
+precio_unitario:precio,
+valor_total:total
 });
 
 }
+
+if(rows.length===0){
+alert("No se detectaron filas válidas");
+return;
+}
+
+const {error}=await client.from("invoice_items").insert(rows);
+
+if(error){
+alert(error.message);
+return;
+}
+
+alert(rows.length+" items importados");
 
 openFactura(invoiceId);
 
 }
 
-/////////////////////// EDIT ITEM
+function enablePasteImport(){
+
+let area=document.getElementById("excel_data");
+
+area.addEventListener("paste",function(){
+
+setTimeout(()=>{
+
+if(area.value.length>20){
+
+if(confirm("¿Importar datos pegados desde Excel?")){
+importExcel(currentInvoiceId);
+}
+
+}
+
+},100);
+
+});
+
+}
+
+//////////////////////// EDIT ITEM
 
 async function editItem(itemId,invoiceId){
 
-const {data}=await client.from("invoice_items").select("*").eq("id",itemId).single();
+const {data}=await client
+.from("invoice_items")
+.select("*")
+.eq("id",itemId)
+.single();
 
 contentArea.innerHTML=`
 
@@ -527,30 +378,26 @@ contentArea.innerHTML=`
 <button onclick="saveItem('${itemId}','${invoiceId}')">Guardar</button>
 <button onclick="openFactura('${invoiceId}')">Cancelar</button>
 
-</div>
-
-`;
+</div>`;
 
 }
 
 async function saveItem(itemId,invoiceId){
 
 await client.from("invoice_items").update({
-
 descripcion:e_desc.value,
 specification:e_spec.value,
 unit:e_unit.value,
 cantidad:e_qty.value,
 precio_unitario:e_price.value,
 valor_total:e_total.value
-
 }).eq("id",itemId);
 
 openFactura(invoiceId);
 
 }
 
-/////////////////////// DELETE ITEM
+//////////////////////// DELETE ITEM
 
 async function deleteItem(id,invoiceId){
 
