@@ -499,27 +499,140 @@ document.addEventListener("change",e=>{
 </script>
 
 
-<!-- ===== SGI v10.5 EXTENSIONS ===== -->
+<!-- =============================== -->
+<!-- SGI v10.6 EXTENSION (FACTURAS) -->
+<!-- =============================== -->
 <script>
 
-function calcUnitPrice(valor_total,cantidad){
- if(!cantidad || cantidad==0) return 0;
- return round2(Number(valor_total)/Number(cantidad));
+function round2(v){
+ return Math.round((Number(v)+Number.EPSILON)*100)/100
 }
 
-function calcISDPercent(codigo){
- // if no code -> 5%
- if(!codigo || codigo.trim()=="") return 5;
- // default when not matched (lookup can be improved later)
- return 2.5;
+function money(v){
+ return round2(v).toLocaleString("en-US",{
+  minimumFractionDigits:2,
+  maximumFractionDigits:2
+ })
+}
+
+function calcPrecioUnitario(valor_total,cantidad){
+ if(!cantidad || cantidad==0) return 0
+ return round2(Number(valor_total)/Number(cantidad))
+}
+
+function calcISDPercent(codigo,subpartidas){
+ if(!codigo || codigo.trim()==="") return 5
+ if(!subpartidas) return 5
+ const found = subpartidas.find(s=>s.codigo_subpartida===codigo)
+ if(found) return Number(found.porcentaje_isd)
+ return 5
 }
 
 function calcISDValor(valor_total,percent){
- return round2(Number(valor_total)*(Number(percent)/100));
+ return round2(Number(valor_total)*(Number(percent)/100))
+}
+
+function calcularItem(item,subpartidas){
+
+ let precio_unitario = calcPrecioUnitario(item.valor_total,item.cantidad)
+
+ let percent = calcISDPercent(item.codigo_subpartida,subpartidas)
+
+ let isd = calcISDValor(item.valor_total,percent)
+
+ return {
+  ...item,
+  precio_unitario,
+  porcentaje_isd:percent,
+  valor_isd:isd
+ }
+
+}
+
+function calcularTotalFactura(items,freight,insurance,others){
+
+ let subtotal = 0
+
+ items.forEach(i=>{
+  subtotal += Number(i.valor_total||0)
+ })
+
+ subtotal = round2(subtotal)
+
+ let total = round2(
+  subtotal +
+  Number(freight||0) +
+  Number(insurance||0) +
+  Number(others||0)
+ )
+
+ return {
+  subtotal,
+  freight:Number(freight||0),
+  insurance:Number(insurance||0),
+  others:Number(others||0),
+  total
+ }
+
+}
+
+function renderItemsFactura(items,subpartidas){
+
+ let rows=""
+
+ items.forEach(i=>{
+
+  let calc = calcularItem(i,subpartidas)
+
+  rows += `
+  <tr>
+   <td>${calc.descripcion||""}</td>
+   <td>${calc.specification||""}</td>
+   <td>${calc.unit||""}</td>
+   <td>${calc.cantidad}</td>
+   <td>${money(calc.valor_total)}</td>
+   <td>${money(calc.precio_unitario)}</td>
+   <td>${calc.codigo_subpartida||""}</td>
+   <td>${calc.porcentaje_isd}%</td>
+   <td>${money(calc.valor_isd)}</td>
+  </tr>
+  `
+
+ })
+
+ return rows
+
+}
+
+function parseExcelRows(text){
+
+ const lines = text.split("\n")
+
+ let items=[]
+
+ lines.forEach(l=>{
+
+  const cols = l.split("\t")
+
+  if(cols.length<6) return
+
+  items.push({
+   descripcion:cols[0],
+   specification:cols[1],
+   unit:cols[2],
+   cantidad:Number(cols[3]),
+   precio_unitario:Number(cols[4]),
+   valor_total:Number(cols[5]),
+   codigo_subpartida:cols[6] ? cols[6].trim() : null
+  })
+
+ })
+
+ return items
+
 }
 
 </script>
-<!-- ===== END SGI v10.5 EXTENSIONS ===== -->
 
 </body>
 
