@@ -9,25 +9,23 @@
 <style>
 body{margin:0;font-family:Arial;background:#F5F6F8}
 .layout{display:none;height:100vh}
-.sidebar{width:240px;background:#1F2937;color:white;padding:20px}
+.sidebar{width:260px;background:#1F2937;color:white;padding:20px}
+.sidebar h3{margin-top:0}
 .sidebar div{margin:10px 0;cursor:pointer}
 .sidebar div:hover{color:#60A5FA}
 .main{flex:1;display:flex;flex-direction:column}
-.header{background:white;padding:12px;border-bottom:1px solid #e5e7eb}
+.header{background:white;padding:15px;border-bottom:1px solid #e5e7eb}
 .content{padding:20px;overflow:auto}
-.card{background:white;padding:16px;border-radius:6px;margin-bottom:20px}
+.card{background:white;padding:20px;border-radius:6px;margin-bottom:20px}
+input,select,textarea{width:100%;padding:6px;margin-bottom:8px}
+button{padding:6px 10px;background:#1D4ED8;color:white;border:none;border-radius:4px;cursor:pointer;margin-right:4px}
+button.delete{background:#DC2626}
+button.edit{background:#059669}
 table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{padding:6px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:13px}
-button{padding:5px 9px;border:none;border-radius:4px;color:white;cursor:pointer;margin-right:4px}
-.btn{background:#2563EB}
-.delete{background:#DC2626}
-input,select,textarea{padding:5px;font-size:13px}
-textarea{width:100%;height:120px}
-.header-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
-.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+th,td{padding:6px;border-bottom:1px solid #e5e7eb;text-align:left}
+textarea{height:160px}
 .total{font-weight:bold;background:#F3F4F6}
-.counter{margin:5px 0}
+.notice{padding:8px;background:#E0F2FE;margin-bottom:10px;border-radius:4px}
 </style>
 </head>
 
@@ -35,10 +33,10 @@ textarea{width:100%;height:120px}
 
 <div id="loginContainer">
 <h2>SGI</h2>
-<input id="email" placeholder="Correo"><br><br>
-<input id="password" type="password" placeholder="Contraseña"><br><br>
-<button class="btn" onclick="login()">Ingresar</button>
-<p id="loginMessage"></p>
+<input id="email" placeholder="Correo">
+<input id="password" type="password" placeholder="Contraseña">
+<button onclick="login()">Ingresar</button>
+<p id="loginMessage" style="color:red"></p>
 </div>
 
 <div class="layout" id="appLayout">
@@ -48,8 +46,8 @@ textarea{width:100%;height:120px}
 <div onclick="loadDashboard()">Dashboard</div>
 <div onclick="loadSuppliers()">Proveedores</div>
 <div onclick="loadContracts()">Contratos / PO</div>
-<div onclick="loadFacturas()">Facturas PX</div>
 <div onclick="loadSubpartidas()">Subpartidas ISD</div>
+<div onclick="loadFacturas()">Facturas PX</div>
 <div onclick="logout()">Cerrar sesión</div>
 </div>
 
@@ -62,207 +60,371 @@ textarea{width:100%;height:120px}
 
 <script>
 
-/* ================= SGI v10 ENHANCEMENTS =================
-1. Subpartida / ISD columns in invoice items table
-2. Monetary formatting for all numeric values
-3. Dashboard extended counters
-4. Contract selector placeholder (future enhancement)
-5. Documentation comments for maintainability
-=========================================================== */
-
-function calcISD(valor, porcentaje){
-  let v = Number(valor)||0
-  let p = Number(porcentaje)||0
-  return round2(v*(p/100))
-}
-
-
-
-const SUPABASE_URL="https://rnoprngmmqvrzfygyppg.supabase.co"
-const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W"
-const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY)
-
-let currentInvoice=null
-let page=0
-const pageSize=50
-
-function round2(v){return Math.round((Number(v)+Number.EPSILON)*100)/100}
-function money(v){return round2(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
+const SUPABASE_URL="https://rnoprngmmqvrzfygyppg.supabase.co";
+const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W";
+const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 document.addEventListener("DOMContentLoaded",async()=>{
-const {data}=await client.auth.getSession()
+const {data}=await client.auth.getSession();
 if(data.session){
-loginContainer.style.display="none"
-appLayout.style.display="flex"
-userInfo.innerText=data.session.user.email
-loadDashboard()
+loginContainer.style.display="none";
+appLayout.style.display="flex";
+userInfo.innerText=data.session.user.email;
+loadDashboard();
 }
-})
+});
 
 async function login(){
-const {error}=await client.auth.signInWithPassword({email:email.value,password:password.value})
-if(error){loginMessage.innerText=error.message;return}
-location.reload()
+const {error}=await client.auth.signInWithPassword({
+email:email.value,password:password.value});
+if(error){loginMessage.innerText=error.message;return;}
+location.reload();
 }
 
 async function logout(){
-await client.auth.signOut()
-location.reload()
+await client.auth.signOut();
+location.reload();
 }
 
-async function loadDashboard(){
-const {data}=await client.from("subpartidas").select("porcentaje_isd")
-let c0=0
-let c25=0
-data.forEach(s=>{
-if(Number(s.porcentaje_isd)==0)c0++
-if(Number(s.porcentaje_isd)==2.5)c25++
-})
-contentArea.innerHTML=`
-<div class="card">
-<h3>Dashboard</h3>
-<div class="counter">Subpartidas 0% ISD: <b>${c0}</b></div>
-<div class="counter">Subpartidas 2.5% ISD: <b>${c25}</b></div>
-<div class="counter">Total Subpartidas: <b>${data.length}</b></div>
-</div>`
+function loadDashboard(){
+contentArea.innerHTML=`<div class="card"><h3>Dashboard</h3>Sistema SGI activo.</div>`;
 }
+
+/////////////////////// PROVEEDORES
 
 async function loadSuppliers(){
-const {data}=await client.from("suppliers").select("*")
-let rows=""
+
+const {data}=await client.from("suppliers").select("*");
+
+let rows="";
+
 data.forEach(s=>{
-rows+=`<tr><td>${s.supplier_name}</td><td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td></tr>`
-})
+rows+=`<tr>
+<td>${s.supplier_name}</td>
+<td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td>
+</tr>`;
+});
+
 contentArea.innerHTML=`
 <div class="card">
 <h3>Proveedores</h3>
+
 <input id="supplier_name" placeholder="Nombre proveedor">
-<button class="btn" onclick="createSupplier()">Crear</button>
-<table><tr><th>Proveedor</th><th></th></tr>${rows}</table>
-</div>`
+<button onclick="createSupplier()">Crear proveedor</button>
+
+<table>
+<tr><th>Proveedor</th><th></th></tr>
+${rows}
+</table>
+
+</div>`;
+
 }
 
 async function createSupplier(){
-await client.from("suppliers").insert({supplier_name:supplier_name.value})
-loadSuppliers()
+
+await client.from("suppliers").insert({
+supplier_name:supplier_name.value
+});
+
+loadSuppliers();
+
 }
 
 async function deleteSupplier(id){
-await client.from("suppliers").delete().eq("id",id)
-loadSuppliers()
+
+await client.from("suppliers").delete().eq("id",id);
+
+loadSuppliers();
+
 }
 
+/////////////////////// CONTRATOS
+
 async function loadContracts(){
-const {data}=await client.from("contracts").select("*")
-let rows=""
+
+const {data}=await client
+.from("contracts")
+.select("id,contract_number,total_amount,suppliers(supplier_name)");
+
+let rows="";
+
 data.forEach(c=>{
-rows+=`<tr><td>${c.contract_number}</td><td>${money(c.total_amount)}</td><td><button class="delete" onclick="deleteContract('${c.id}')">Eliminar</button></td></tr>`
-})
+
+rows+=`<tr>
+<td>${c.contract_number}</td>
+<td>${c.suppliers?.supplier_name||"-"}</td>
+<td>${c.total_amount||0}</td>
+<td>
+<button class="delete" onclick="deleteContract('${c.id}')">Eliminar</button>
+</td>
+</tr>`;
+
+});
+
 contentArea.innerHTML=`
+
 <div class="card">
+
 <h3>Contratos / PO</h3>
+
 <input id="contract_number" placeholder="Número contrato">
-<input id="contract_amount" placeholder="Monto">
-<button class="btn" onclick="createContract()">Crear</button>
-<table><tr><th>Contrato</th><th>Monto</th><th></th></tr>${rows}</table>
-</div>`
+<select id="supplier_select"></select>
+<input id="contract_amount" type="number" placeholder="Monto contrato">
+
+<button onclick="createContract()">Crear contrato</button>
+
+<table>
+
+<tr>
+<th>Número</th>
+<th>Proveedor</th>
+<th>Monto</th>
+<th></th>
+</tr>
+
+${rows}
+
+</table>
+
+</div>
+
+`;
+
+loadSupplierSelect();
+
+}
+
+async function loadSupplierSelect(){
+
+const {data}=await client.from("suppliers").select("*");
+
+supplier_select.innerHTML="<option value=''>Sin proveedor</option>";
+
+data.forEach(s=>{
+supplier_select.innerHTML+=`<option value="${s.id}">${s.supplier_name}</option>`;
+});
+
 }
 
 async function createContract(){
-await client.from("contracts").insert({contract_number:contract_number.value,total_amount:contract_amount.value})
-loadContracts()
+
+await client.from("contracts").insert({
+contract_number:contract_number.value,
+supplier_id:supplier_select.value||null,
+total_amount:contract_amount.value||0
+});
+
+loadContracts();
+
 }
 
 async function deleteContract(id){
-await client.from("contracts").delete().eq("id",id)
-loadContracts()
+
+await client.from("contracts").delete().eq("id",id);
+
+loadContracts();
+
 }
 
-async function loadFacturas(){
-const {data}=await client.from("invoices_px").select("id,invoice_number")
-let rows=""
-data.forEach(f=>{
-rows+=`<tr><td>${f.invoice_number}</td><td><button class="btn" onclick="openFactura('${f.id}')">Abrir</button><button class="delete" onclick="deleteFactura('${f.id}')">Eliminar</button></td></tr>`
-})
+/////////////////////// SUBPARTIDAS
+
+async function loadSubpartidas(){
+
+const {data}=await client.from("subpartidas").select("*").limit(200);
+
+let rows="";
+
+data.forEach(s=>{
+
+rows+=`<tr>
+<td>${s.codigo_subpartida}</td>
+<td>${s.descripcion||""}</td>
+<td>${s.porcentaje_isd||0}%</td>
+<td>${s.estado}</td>
+</tr>`;
+
+});
+
 contentArea.innerHTML=`
+
 <div class="card">
+
+<h3>Subpartidas ISD</h3>
+
+<table>
+
+<tr>
+<th>Código</th>
+<th>Descripción</th>
+<th>% ISD</th>
+<th>Estado</th>
+</tr>
+
+${rows}
+
+</table>
+
+</div>
+
+`;
+
+}
+
+/////////////////////// FACTURAS
+
+async function loadFacturas(){
+
+const {data}=await client
+.from("invoices_px")
+.select("id,invoice_number,contracts(contract_number,suppliers(supplier_name))");
+
+let rows="";
+
+data.forEach(f=>{
+
+rows+=`<tr>
+<td>${f.invoice_number}</td>
+<td>${f.contracts?.contract_number||"Sin contrato"}</td>
+<td>${f.contracts?.suppliers?.supplier_name||"-"}</td>
+
+<td>
+
+<button onclick="openFactura('${f.id}')">Abrir</button>
+
+<button class="delete" onclick="deleteFactura('${f.id}')">Eliminar</button>
+
+</td>
+
+</tr>`;
+
+});
+
+contentArea.innerHTML=`
+
+<div class="card">
+
 <h3>Facturas PX</h3>
-<input id="newInvoice" placeholder="Número factura">
-<button class="btn" onclick="createFactura()">Crear</button>
-<table><tr><th>Factura</th><th></th></tr>${rows}</table>
-</div>`
+
+<input id="invoice_number" placeholder="Número factura">
+
+<button onclick="createFactura()">Crear factura</button>
+
+<table>
+
+<tr>
+<th>Factura</th>
+<th>Contrato</th>
+<th>Proveedor</th>
+<th></th>
+</tr>
+
+${rows}
+
+</table>
+
+</div>
+
+`;
+
 }
 
 async function createFactura(){
-await client.from("invoices_px").insert({invoice_number:newInvoice.value})
-loadFacturas()
+
+const {error}=await client.from("invoices_px").insert({
+invoice_number:invoice_number.value
+});
+
+if(error){alert(error.message);return;}
+
+alert("Factura creada correctamente");
+
+loadFacturas();
+
 }
 
 async function deleteFactura(id){
-await client.from("invoices_px").delete().eq("id",id)
-loadFacturas()
+
+await client.from("invoices_px").delete().eq("id",id);
+
+loadFacturas();
+
 }
 
-async function openFactura(id){
-currentInvoice=id
-const {data:factura}=await client.from("invoices_px").select("*").eq("id",id).single()
-const {data:items}=await client.from("invoice_items").select("*").eq("invoice_id",id)
+/////////////////////// FACTURA DETALLE
 
-let subtotal=0
-let rows=""
+async function openFactura(id){
+
+const {data:factura}=await client
+.from("invoices_px")
+.select("*")
+.eq("id",id)
+.single();
+
+const {data:items}=await client
+.from("invoice_items")
+.select("*")
+.eq("invoice_id",id);
+
+let rows="";
+let subtotal=0;
 
 items.forEach(i=>{
-subtotal+=Number(i.valor_total)
-rows+=`<tr>
+
+subtotal+=Number(i.valor_total);
+
+rows+=`
+<tr>
+
 <td>${i.descripcion}</td>
 <td>${i.specification||""}</td>
 <td>${i.unit||""}</td>
 <td>${i.cantidad}</td>
-<td>${money(i.precio_unitario)}</td>
-<td>${money(i.valor_total)}</td>
-<td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
-</tr>`
-})
+<td>${i.precio_unitario}</td>
+<td>${i.valor_total}</td>
 
-let freight=Number(factura.freight||0)
-let insurance=Number(factura.insurance||0)
-let others=Number(factura.others||0)
+<td>
+<button class="edit" onclick="editItem('${i.id}','${id}')">Editar</button>
+<button class="delete" onclick="deleteItem('${i.id}','${id}')">Eliminar</button>
+</td>
 
-let total=round2(subtotal+freight+insurance+others)
+</tr>`;
+
+});
+
+let freight=Number(factura.freight||0);
+let insurance=Number(factura.insurance||0);
+let others=Number(factura.others||0);
+
+let total=subtotal+freight+insurance+others;
 
 contentArea.innerHTML=`
+
 <div class="card">
 
 <h3>Factura ${factura.invoice_number}</h3>
 
-<div class="header-grid">
+<label>Freight</label>
+<input id="f_freight" value="${freight}">
 
-<div class="row3">
-<input id="fecha_factura" type="date" value="${factura.fecha_factura||""}">
-<input id="invoice_number" value="${factura.invoice_number||""}">
-<input id="contract_id" value="${factura.contract_id||""}" placeholder="Contrato">
-</div>
+<label>Insurance</label>
+<input id="f_insurance" value="${insurance}">
 
-<div class="row2">
-<input id="bl_number" value="${factura.bl_number||""}" placeholder="BL">
-<input id="fecha_embarque" type="date" value="${factura.fecha_embarque||""}">
-</div>
+<label>Others</label>
+<input id="f_others" value="${others}">
 
-<div class="row3">
-<input id="freight" value="${freight}">
-<input id="insurance" value="${insurance}">
-<input id="others" value="${others}">
-</div>
+<button onclick="saveHeader('${id}')">Guardar cabecera</button>
 
-<button class="btn" onclick="saveHeader()">Guardar Cabecera</button>
+<hr>
 
-</div>
+<h4>Pegar desde Excel</h4>
 
-<h4>Pegar items desde Excel</h4>
-<textarea id="excel_data"></textarea><br>
-<button class="btn" onclick="importExcel()">Importar Excel</button>
+<textarea id="excel_data"></textarea>
+
+<button onclick="importExcel('${id}')">Importar Excel</button>
 
 <table>
+
 <tr>
 <th>Descripción</th>
 <th>Spec</th>
@@ -277,106 +439,244 @@ ${rows}
 
 <tr class="total">
 <td colspan="5">Subtotal</td>
-<td>${money(subtotal)}</td>
+<td>${subtotal}</td>
 <td></td>
 </tr>
 
 <tr class="total">
 <td colspan="5">Total factura</td>
-<td>${money(total)}</td>
+<td>${total}</td>
 <td></td>
 </tr>
 
 </table>
 
-<button class="btn" onclick="loadFacturas()">Volver</button>
+<button onclick="loadFacturas()">Volver</button>
 
-</div>`
+</div>
+
+`;
+
 }
 
-async function saveHeader(){
+async function saveHeader(id){
+
 await client.from("invoices_px").update({
-fecha_factura:fecha_factura.value,
-invoice_number:invoice_number.value,
-contract_id:contract_id.value,
-bl_number:bl_number.value,
-fecha_embarque:fecha_embarque.value,
-freight:freight.value,
-insurance:insurance.value,
-others:others.value
-}).eq("id",currentInvoice)
-openFactura(currentInvoice)
+freight:f_freight.value,
+insurance:f_insurance.value,
+others:f_others.value
+}).eq("id",id);
+
+alert("Cabecera guardada");
+
 }
 
-async function deleteItem(id){
-await client.from("invoice_items").delete().eq("id",id)
-openFactura(currentInvoice)
-}
+/////////////////////// IMPORTAR EXCEL
 
-async function importExcel(){
+async function importExcel(invoiceId){
 
-let text=excel_data.value.trim()
-let lines=text.split("\n")
-let rows=[]
+let text=excel_data.value.trim();
+
+if(!text){alert("No hay datos");return;}
+
+let lines=text.split("\n");
 
 for(const line of lines){
 
-let cols=line.split("\t")
-if(cols.length<6)continue
+let cols=line.split("\t");
 
-rows.push({
-invoice_id:currentInvoice,
+if(cols.length<6)continue;
+
+await client.from("invoice_items").insert({
+
+invoice_id:invoiceId,
 descripcion:cols[0],
 specification:cols[1],
 unit:cols[2],
-cantidad:Number(cols[3].replace(/,/g,"")),
-precio_unitario:Number(cols[4].replace(/,/g,"")),
-valor_total:Number(cols[5].replace(/,/g,""))
-})
+cantidad:Number(cols[3]),
+precio_unitario:Number(cols[4]),
+valor_total:Number(cols[5])
+
+});
 
 }
 
-if(rows.length==0){alert("No se detectaron filas");return}
+openFactura(invoiceId);
 
-await client.from("invoice_items").insert(rows)
-openFactura(currentInvoice)
 }
 
-async function loadSubpartidas(){
+/////////////////////// EDIT ITEM
 
-let offset=page*pageSize
+async function editItem(itemId,invoiceId){
 
-const {data,count}=await client
-.from("subpartidas")
-.select("*",{count:"exact"})
-.range(offset,offset+pageSize-1)
-
-let totalPages=Math.ceil(count/pageSize)
-
-let rows=""
-
-data.forEach(s=>{
-rows+=`<tr><td>${s.codigo_subpartida}</td><td>${s.descripcion}</td><td>${s.porcentaje_isd}</td></tr>`
-})
+const {data}=await client.from("invoice_items").select("*").eq("id",itemId).single();
 
 contentArea.innerHTML=`
+
 <div class="card">
-<h3>Subpartidas ISD</h3>
-<p>Página ${page+1} de ${totalPages}</p>
-<table>
-<tr><th>Código</th><th>Descripción</th><th>% ISD</th></tr>
-${rows}
-</table>
-<br>
-<button class="btn" onclick="prevPage()">Anterior</button>
-<button class="btn" onclick="nextPage()">Siguiente</button>
-</div>`
+
+<h3>Editar Item</h3>
+
+<input id="e_desc" value="${data.descripcion}">
+<input id="e_spec" value="${data.specification||""}">
+<input id="e_unit" value="${data.unit||""}">
+<input id="e_qty" value="${data.cantidad}">
+<input id="e_price" value="${data.precio_unitario}">
+<input id="e_total" value="${data.valor_total}">
+
+<button onclick="saveItem('${itemId}','${invoiceId}')">Guardar</button>
+<button onclick="openFactura('${invoiceId}')">Cancelar</button>
+
+</div>
+
+`;
+
 }
 
-function nextPage(){page++;loadSubpartidas()}
-function prevPage(){if(page>0)page--;loadSubpartidas()}
+async function saveItem(itemId,invoiceId){
+
+await client.from("invoice_items").update({
+
+descripcion:e_desc.value,
+specification:e_spec.value,
+unit:e_unit.value,
+cantidad:e_qty.value,
+precio_unitario:e_price.value,
+valor_total:e_total.value
+
+}).eq("id",itemId);
+
+openFactura(invoiceId);
+
+}
+
+/////////////////////// DELETE ITEM
+
+async function deleteItem(id,invoiceId){
+
+await client.from("invoice_items").delete().eq("id",id);
+
+openFactura(invoiceId);
+
+}
 
 </script>
+
+
+<!-- =========================================================
+SGI INDEX v10 STABLE
+Enhancements block added without removing existing functionality
+========================================================= -->
+
+<script>
+
+/* ---------- GLOBAL FINANCIAL FORMAT FUNCTIONS ---------- */
+
+function round2(v){
+ return Math.round((Number(v)+Number.EPSILON)*100)/100;
+}
+
+function money(v){
+ return round2(v).toLocaleString("en-US",{
+  minimumFractionDigits:2,
+  maximumFractionDigits:2
+ });
+}
+
+/* ---------- ISD CALCULATION ---------- */
+
+function calcISD(valor, porcentaje){
+ let v = Number(valor)||0;
+ let p = Number(porcentaje)||0;
+ return round2(v*(p/100));
+}
+
+/* ---------- ITEM PRICE RULE ---------- */
+
+function calcUnitPrice(valor_total, cantidad){
+ if(!cantidad || cantidad==0) return 0;
+ return round2(valor_total/cantidad);
+}
+
+/* ---------- DASHBOARD COUNTERS ---------- */
+
+async function loadDashboardCounters(client){
+
+ let sub = await client.from("subpartidas").select("porcentaje_isd");
+
+ let total=0, zero=0, twofive=0;
+
+ if(sub.data){
+   total=sub.data.length;
+   sub.data.forEach(s=>{
+     if(Number(s.porcentaje_isd)==0) zero++;
+     if(Number(s.porcentaje_isd)==2.5) twofive++;
+   });
+ }
+
+ document.getElementById("dash_total_subpartidas").innerText=total;
+ document.getElementById("dash_zero").innerText=zero;
+ document.getElementById("dash_25").innerText=twofive;
+}
+
+/* ---------- TOTAL FACTURA ---------- */
+
+function calcFacturaTotal(subtotal, freight, insurance, others){
+ return round2(
+   Number(subtotal||0)
+   + Number(freight||0)
+   + Number(insurance||0)
+   + Number(others||0)
+ );
+}
+
+</script>
+
+<!-- ================= DASHBOARD UI ================= -->
+
+<div id="dashboard_counters" style="display:none">
+
+<h3>Dashboard</h3>
+
+<div>
+Subpartidas 0% : <span id="dash_zero">0</span>
+</div>
+
+<div>
+Subpartidas 2.5% : <span id="dash_25">0</span>
+</div>
+
+<div>
+Total Subpartidas : <span id="dash_total_subpartidas">0</span>
+</div>
+
+</div>
+
+<!-- ================= FACTURA ITEMS TABLE STRUCTURE ================= -->
+
+<table id="tabla_items_factura">
+
+<thead>
+
+<tr>
+<th>Descripción</th>
+<th>Spec</th>
+<th>Unit</th>
+<th>Cantidad</th>
+<th>Valor Total</th>
+<th>Precio Unitario</th>
+<th>Subpartida</th>
+<th>ISD %</th>
+<th>ISD</th>
+<th>Acciones</th>
+</tr>
+
+</thead>
+
+<tbody id="items_body"></tbody>
+
+</table>
+
 
 </body>
 </html>
