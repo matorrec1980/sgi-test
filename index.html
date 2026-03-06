@@ -498,6 +498,29 @@ document.addEventListener("change",e=>{
 
 </script>
 
+
+<!-- ===== SGI v10.5 EXTENSIONS ===== -->
+<script>
+
+function calcUnitPrice(valor_total,cantidad){
+ if(!cantidad || cantidad==0) return 0;
+ return round2(Number(valor_total)/Number(cantidad));
+}
+
+function calcISDPercent(codigo){
+ // if no code -> 5%
+ if(!codigo || codigo.trim()=="") return 5;
+ // default when not matched (lookup can be improved later)
+ return 2.5;
+}
+
+function calcISDValor(valor_total,percent){
+ return round2(Number(valor_total)*(Number(percent)/100));
+}
+
+</script>
+<!-- ===== END SGI v10.5 EXTENSIONS ===== -->
+
 </body>
 
 <!-- ===================== SGI SYSTEM DOCUMENTATION =====================
