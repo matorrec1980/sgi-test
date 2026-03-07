@@ -123,7 +123,7 @@ text-align:right;
 .actionMenu{
 background:#1D4ED8;
 color:white;
-
+font-weight:bold;
 cursor:pointer;
 font-weight:bold;
 padding:2px 6px;
@@ -451,7 +451,7 @@ rows+=`<tr>
 <td>${money(i.valor_total)}</td>
 <td>${i.codigo_subpartida||""}</td><td id="isd_${i.id}">...</td>
 <td>
-<button class="actionMenu" onclick="toggleMenu('${i.id}')">⋮</button>
+<button onclick="toggleMenu('${i.id}')">⋮</button>
 <div id="menu_${i.id}" style="display:none">
 <button class="btn-edit" onclick="editItem('${i.id}')">Editar</button>
 <button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button>
@@ -597,12 +597,14 @@ freight:parseFloat(freight.value.replace(/,/g,""))||0,
 insurance:parseFloat(insurance.value.replace(/,/g,""))||0,
 others:parseFloat(others.value.replace(/,/g,""))||0
 }).eq("id",currentInvoice)
-openFactura(currentInvoice)
+openFactura(currentInvoice);
+ setTimeout(renderISD,200)
 }
 
 async function deleteItem(id){
 await client.from("invoice_items").delete().eq("id",id)
-openFactura(currentInvoice)
+openFactura(currentInvoice);
+ setTimeout(renderISD,200)
 }
 
 async function importExcel(){
@@ -632,7 +634,8 @@ codigo_subpartida:cols[6] ? cols[6].trim() : null
 if(rows.length==0){alert("No se detectaron filas");return}
 
 await client.from("invoice_items").insert(rows)
-openFactura(currentInvoice)
+openFactura(currentInvoice);
+ setTimeout(renderISD,200)
 }
 
 async function loadSubpartidas(){
@@ -692,40 +695,60 @@ document.addEventListener("change",e=>{
 
 
 
+
 async function getISDPercent(code){
 
- if(!code || code.trim()=="") return 5;
+ if(!code || code.trim()==="") return 5
 
  try{
 
-   const prefix = code.trim().substring(0,6);
-
-   const {data}=await client
-   .from("subpartidas")
-   .select("porcentaje_isd,codigo_subpartida")
-   .ilike("codigo_subpartida", prefix + "%")
-   .limit(1)
-   .maybeSingle();
-
-   if(!data) return 5;
-
-   return Number(data.porcentaje_isd) || 5;
-
- }catch(e){
-   return 5;
- }
-
-}=await client
+   const {data,error}=await client
    .from("subpartidas")
    .select("porcentaje_isd")
-   .eq("codigo_subpartida",code)
-   .maybeSingle();
-   if(!data) return 5;
-   return Number(data.porcentaje_isd)||5;
+   .eq("codigo_subpartida",code.trim())
+   .maybeSingle()
+
+   if(error){
+      console.log(error)
+      return 5
+   }
+
+   if(!data) return 5
+
+   return Number(data.porcentaje_isd) || 5
+
  }catch(e){
-   return 5;
+
+   console.log(e)
+   return 5
+
  }
+
 }
+
+
+async function renderISD(){
+
+ const rows=document.querySelectorAll("#itemsTable tr")
+
+ for(const r of rows){
+
+   if(r.children.length < 8) continue
+
+   const subCell=r.children[6]
+   const isdCell=r.children[7]
+
+   if(!subCell || !isdCell) continue
+
+   const code=subCell.innerText.trim()
+
+   const percent=await getISDPercent(code)
+
+   isdCell.innerText=percent + "%"
+ }
+
+}
+
 function toggleMenu(id){
  const m=document.getElementById("menu_"+id)
  if(!m) return
@@ -755,7 +778,8 @@ function editItem(id){
 
  cells[8].innerHTML=`
  <button class="btn-save" onclick="saveItem('${id}')">Guardar</button>
- <button class="btn-cancel" onclick="openFactura(currentInvoice)">Cancelar</button>
+ <button class="btn-cancel" onclick="openFactura(currentInvoice);
+ setTimeout(renderISD,200)">Cancelar</button>
  `
 }
 
@@ -780,7 +804,8 @@ async function saveItem(id){
   codigo_subpartida:sub||null
  }).eq("id",id)
 
- openFactura(currentInvoice)
+ openFactura(currentInvoice);
+ setTimeout(renderISD,200)
 }
 /* ===== END PATCH ===== */
 
@@ -815,36 +840,28 @@ function calcISDValor(valor_total,percent){
 <script>
 
 
-async function renderISD(){
+setTimeout(async ()=>{
 
- const rows=document.querySelectorAll("#itemsTable tr");
+ const rows=document.querySelectorAll("#itemsTable tr")
 
  for(const r of rows){
 
-   if(r.children.length < 8) continue;
+   if(r.children.length < 8) continue
 
-   const subCell=r.children[6];
-   const isdCell=r.children[7];
+   const subCell=r.children[6]
+   const isdCell=r.children[7]
 
-   if(!subCell || !isdCell) continue;
+   if(!subCell || !isdCell) continue
 
-   const code=subCell.innerText.trim();
+   const code=subCell.innerText.trim()
 
-   let percent=5;
+   let percent=await getISDPercent(code); if(!percent){percent=5;}
 
-   try{
-     percent=await getISDPercent(code);
-     if(!percent) percent=5;
-   }catch(e){
-     percent=5;
-   }
+   isdCell.innerText=percent+"%"
 
-   isdCell.innerText=percent + "%";
  }
 
-}
-
-setTimeout(renderISD,400);
+},500);
 
 
 </script>
