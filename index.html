@@ -1,10 +1,40 @@
 
-<!-- SGI FACTURAS PX ENGINEERING DOCUMENTATION
-valor_total = dominant accounting field
+<!-- ===========================================================
+SGI FACTURAS PX MODULE DOCUMENTATION
+
+Purpose:
+Register import invoices and items before ISD payment processing.
+
+Accounting rule:
+valor_total = dominant value
 precio_unitario = valor_total / cantidad
-ISD is not calculated here; only percentage displayed
-Actual ISD will be calculated in Payment module
--->
+
+ISD:
+This module only displays the ISD percentage.
+The real tax calculation will occur in the Payments module
+after freight/insurance/others proration.
+
+If subpartida exists → use database percentage
+If subpartida missing → default 5%
+If subpartida null → default 5%
+
+Totals:
+Subtotal items
++ Freight (if >0)
++ Insurance (if >0)
++ Others (if >0)
+= TOTAL FACTURA
+
+Excel structure:
+Descripción
+Especificación
+Unidad
+Cantidad
+Precio Unitario
+Valor Total
+Subpartida
+
+=========================================================== -->
 
 
 <!-- ============================================================
@@ -67,6 +97,37 @@ This section ensures architectural knowledge stays with the code.
 <!DOCTYPE html>
 <html>
 <head>
+
+<style>
+.header-grid{
+display:grid;
+grid-template-columns: 1fr 1fr 1fr;
+gap:12px;
+margin-bottom:10px;
+}
+.header-grid-2{
+display:grid;
+grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+gap:12px;
+margin-bottom:10px;
+}
+.fieldLabel{
+font-size:12px;
+font-weight:600;
+display:block;
+margin-bottom:3px;
+}
+.money{
+text-align:right;
+}
+.actionMenu{
+cursor:pointer;
+font-weight:bold;
+padding:2px 6px;
+border-radius:4px;
+}
+</style>
+
 <meta charset="UTF-8">
 <title>SGI - Sistema de Gestión de Importaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
@@ -129,8 +190,8 @@ grid-template-columns:1fr 1fr;
 gap:12px;
 align-items:end;
 }
-
-
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .total{font-weight:bold;background:#F3F4F6}
 .counter{margin:5px 0}
 
@@ -356,8 +417,7 @@ rows+=`<tr>
 <td>${i.cantidad}</td>
 <td>${money(i.precio_unitario)}</td>
 <td>${money(i.valor_total)}</td>
-<td>${i.codigo_subpartida||""}</td>
-<td id="isd_${i.id}">...</td>
+<td>${i.codigo_subpartida||""}</td><td id="isd_${i.id}">...</td>
 <td>
 <button onclick="toggleMenu('${i.id}')">⋮</button>
 <div id="menu_${i.id}" style="display:none">
@@ -452,8 +512,7 @@ contentArea.innerHTML+=`
 <th>Cantidad</th>
 <th>Precio</th>
 <th>Valor Total</th>
-<th>Subpartida</th>
-<th>% ISD</th>
+<th>Subpartida</th><th>% ISD</th>
 <th></th>
 </tr>
 
@@ -498,16 +557,6 @@ ${others>0?`
 </tr>
 
 </table>
-<script>
-setTimeout(async ()=>{
- const rows=document.querySelectorAll('[id^="isd_"]');
- for(const r of rows){
-  const code=r.parentElement.children[6].innerText.trim();
-  const p=await getISDPercent(code);
-  r.innerText=p+"%";
- }
-},100);
-</script>
 
 <button class="btn" onclick="loadFacturas()">Volver</button>
 
@@ -622,13 +671,17 @@ document.addEventListener("change",e=>{
 
 async function getISDPercent(code){
  if(!code || code.trim()=="") return 5;
- const {data}=await client
-  .from("subpartidas")
-  .select("porcentaje_isd")
-  .eq("codigo_subpartida",code)
-  .maybeSingle();
- if(!data) return 5;
- return Number(data.porcentaje_isd)||5;
+ try{
+   const {data}=await client
+   .from("subpartidas")
+   .select("porcentaje_isd")
+   .eq("codigo_subpartida",code)
+   .maybeSingle();
+   if(!data) return 5;
+   return Number(data.porcentaje_isd)||5;
+ }catch(e){
+   return 5;
+ }
 }
 function toggleMenu(id){
  const m=document.getElementById("menu_"+id)
@@ -722,6 +775,22 @@ function calcISDValor(valor_total,percent){
 
 </script>
 <!-- ===== END SGI v10.5 EXTENSIONS ===== -->
+
+
+<script>
+setTimeout(async ()=>{
+ const cells=document.querySelectorAll('[id^="isd_"]');
+ for(const c of cells){
+   try{
+     const code=c.parentElement.children[6].innerText.trim();
+     const p=await getISDPercent(code);
+     c.innerText=p+"%";
+   }catch(e){
+     c.innerText="5%";
+   }
+ }
+},200);
+</script>
 
 </body>
 
