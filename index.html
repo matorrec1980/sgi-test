@@ -554,41 +554,26 @@ contentArea.innerHTML+=`
 ${rows}
 
 <tr class="total">
-<td colspan="5">Subtotal items</td>
-<td>${money(subtotal)}</td>
-<td></td>
-<td></td>
+<td colspan="5">Subtotal items</td><td class="money">${money(subtotal)}</td><td colspan="3"></td>
 </tr>
 
 ${freight>0?`
 <tr>
-<td colspan="5">Freight</td>
-<td>${money(freight)}</td>
-<td></td>
-<td></td>
+<td colspan="5">Freight</td><td class="money">${money(freight)}</td><td colspan="3"></td>
 </tr>`:""}
 
 ${insurance>0?`
 <tr>
-<td colspan="5">Insurance</td>
-<td>${money(insurance)}</td>
-<td></td>
-<td></td>
+<td colspan="5">Insurance</td><td class="money">${money(insurance)}</td><td colspan="3"></td>
 </tr>`:""}
 
 ${others>0?`
 <tr>
-<td colspan="5">Others</td>
-<td>${money(others)}</td>
-<td></td>
-<td></td>
+<td colspan="5">Others</td><td class="money">${money(others)}</td><td colspan="3"></td>
 </tr>`:""}
 
 <tr class="total">
-<td colspan="5">TOTAL FACTURA</td>
-<td>${money(total)}</td>
-<td></td>
-<td></td>
+<td colspan="5">TOTAL FACTURA</td><td class="money">${money(total)}</td><td colspan="3"></td>
 </tr>
 
 </table>
@@ -822,7 +807,7 @@ setTimeout(async ()=>{
 
    const code=subCell.innerText.trim()
 
-   const percent=await getISDPercent(code)
+   let percent=await getISDPercent(code); if(!percent){percent=5;}
 
    isdCell.innerText=percent+"%"
 
