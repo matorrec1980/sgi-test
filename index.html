@@ -136,21 +136,7 @@ async function loadSuppliers(){
 const {data}=await client.from("suppliers").select("*")
 let rows=""
 data.forEach(s=>{
-let percent = calcISDPercent(i.codigo_subpartida)
-let isd = calcISDValor(i.valor_total,percent)
-
-rows+=`<tr>
-<td>${i.descripcion}</td>
-<td>${i.specification||""}</td>
-<td>${i.unit||""}</td>
-<td>${i.cantidad}</td>
-<td>${money(i.precio_unitario)}</td>
-<td>${money(i.valor_total)}</td>
-<td>${i.codigo_subpartida||""}</td>
-<td>${percent}%</td>
-<td>${money(isd)}</td>
-<td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
-</tr>`
+rows+=`<tr><td>${s.supplier_name}</td><td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td></tr>`
 })
 contentArea.innerHTML=`
 <div class="card">
@@ -175,21 +161,7 @@ async function loadContracts(){
 const {data}=await client.from("contracts").select("*")
 let rows=""
 data.forEach(c=>{
-let percent = calcISDPercent(i.codigo_subpartida)
-let isd = calcISDValor(i.valor_total,percent)
-
-rows+=`<tr>
-<td>${i.descripcion}</td>
-<td>${i.specification||""}</td>
-<td>${i.unit||""}</td>
-<td>${i.cantidad}</td>
-<td>${money(i.precio_unitario)}</td>
-<td>${money(i.valor_total)}</td>
-<td>${i.codigo_subpartida||""}</td>
-<td>${percent}%</td>
-<td>${money(isd)}</td>
-<td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
-</tr>`
+rows+=`<tr><td>${c.contract_number}</td><td>${money(c.total_amount)}</td><td><button class="delete" onclick="deleteContract('${c.id}')">Eliminar</button></td></tr>`
 })
 contentArea.innerHTML=`
 <div class="card">
@@ -215,21 +187,7 @@ async function loadFacturas(){
 const {data}=await client.from("invoices_px").select("id,invoice_number")
 let rows=""
 data.forEach(f=>{
-let percent = calcISDPercent(i.codigo_subpartida)
-let isd = calcISDValor(i.valor_total,percent)
-
-rows+=`<tr>
-<td>${i.descripcion}</td>
-<td>${i.specification||""}</td>
-<td>${i.unit||""}</td>
-<td>${i.cantidad}</td>
-<td>${money(i.precio_unitario)}</td>
-<td>${money(i.valor_total)}</td>
-<td>${i.codigo_subpartida||""}</td>
-<td>${percent}%</td>
-<td>${money(isd)}</td>
-<td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
-</tr>`
+rows+=`<tr><td>${f.invoice_number}</td><td><button class="btn" onclick="openFactura('${f.id}')">Abrir</button><button class="delete" onclick="deleteFactura('${f.id}')">Eliminar</button></td></tr>`
 })
 contentArea.innerHTML=`
 <div class="card">
@@ -293,9 +251,6 @@ let rows=""
 
 items.forEach(i=>{
 subtotal+=Number(i.valor_total)
-let percent = calcISDPercent(i.codigo_subpartida)
-let isd = calcISDValor(i.valor_total,percent)
-
 rows+=`<tr>
 <td>${i.descripcion}</td>
 <td>${i.specification||""}</td>
@@ -303,9 +258,6 @@ rows+=`<tr>
 <td>${i.cantidad}</td>
 <td>${money(i.precio_unitario)}</td>
 <td>${money(i.valor_total)}</td>
-<td>${i.codigo_subpartida||""}</td>
-<td>${percent}%</td>
-<td>${money(isd)}</td>
 <td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
 </tr>`
 })
@@ -354,14 +306,11 @@ contentArea.innerHTML+=`
 <table>
 <tr>
 <th>Descripción</th>
-<th>Especificación</th>
-<th>Unidad</th>
+<th>Spec</th>
+<th>Unit</th>
 <th>Cantidad</th>
 <th>Precio</th>
 <th>Total</th>
-<th>Subpartida</th>
-<th>ISD %</th>
-<th>ISD</th>
 <th></th>
 </tr>
 
@@ -423,8 +372,7 @@ specification:cols[1],
 unit:cols[2],
 cantidad:Number(cols[3].replace(/,/g,"")),
 precio_unitario:Number(cols[4].replace(/,/g,"")),
-valor_total:Number(cols[5].replace(/,/g,"")),
-codigo_subpartida:cols[6]||null
+valor_total:Number(cols[5].replace(/,/g,""))
 })
 
 }
