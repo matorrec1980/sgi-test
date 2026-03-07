@@ -25,6 +25,33 @@ document.addEventListener("change",e=>{
  if(ids.includes(e.target.id)) saveFacturaHeader()
 })
 
+
+function editItem(id){
+ const row=document.querySelector('[data-id="'+id+'"]')
+ if(!row) return
+ row.contentEditable=true
+ const cell=row.querySelector(".actions")
+ cell.innerHTML=`
+   <button onclick="saveItem('${id}')">Guardar</button>
+   <button onclick="cancelEdit()">Cancelar</button>
+ `
+}
+
+function saveItem(id){
+ // placeholder save logic (actual supabase save exists elsewhere)
+ alert("Item guardado (demo).")
+ location.reload()
+}
+
+function cancelEdit(){
+ location.reload()
+}
+
+
+function visibleCharge(value){
+ return Number(value)>0
+}
+
 </script>
 
 <style>
@@ -49,6 +76,20 @@ textarea{width:100%;height:120px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .total{font-weight:bold;background:#F3F4F6}
 .counter{margin:5px 0}
+
+/* ===== SGI UI FIELDS ===== */
+.fieldLabel{
+ font-size:12px;
+ font-weight:600;
+ display:block;
+ margin-bottom:2px;
+ color:#444;
+}
+
+.money{
+ text-align:right;
+}
+
 </style>
 </head>
 
@@ -294,9 +335,9 @@ contentArea.innerHTML=`
 </div>
 
 <div class="row3">
-<input id="freight" value="${freight}">
-<input id="insurance" value="${insurance}">
-<input id="others" value="${others}">
+<label class="fieldLabel">Freight</label><input class="money" id="freight" value="${freight}">
+<label class="fieldLabel">Insurance</label><input class="money" id="insurance" value="${insurance}">
+<label class="fieldLabel">Others</label><input class="money" id="others" value="${others}">
 </div>
 
 <button class="btn" onclick="saveHeader()">Guardar Cabecera</button>`
@@ -480,6 +521,33 @@ function editItem(id){
  alert("Edición de item pendiente de implementar")
 }
 
+
+function editItem(id){
+ const row=document.querySelector('[data-id="'+id+'"]')
+ if(!row) return
+ row.contentEditable=true
+ const cell=row.querySelector(".actions")
+ cell.innerHTML=`
+   <button onclick="saveItem('${id}')">Guardar</button>
+   <button onclick="cancelEdit()">Cancelar</button>
+ `
+}
+
+function saveItem(id){
+ // placeholder save logic (actual supabase save exists elsewhere)
+ alert("Item guardado (demo).")
+ location.reload()
+}
+
+function cancelEdit(){
+ location.reload()
+}
+
+
+function visibleCharge(value){
+ return Number(value)>0
+}
+
 </script>
 
 
@@ -538,6 +606,33 @@ document.addEventListener("change",e=>{
  if(ids.includes(e.target.id)) saveFacturaHeader()
 })
 
+
+function editItem(id){
+ const row=document.querySelector('[data-id="'+id+'"]')
+ if(!row) return
+ row.contentEditable=true
+ const cell=row.querySelector(".actions")
+ cell.innerHTML=`
+   <button onclick="saveItem('${id}')">Guardar</button>
+   <button onclick="cancelEdit()">Cancelar</button>
+ `
+}
+
+function saveItem(id){
+ // placeholder save logic (actual supabase save exists elsewhere)
+ alert("Item guardado (demo).")
+ location.reload()
+}
+
+function cancelEdit(){
+ location.reload()
+}
+
+
+function visibleCharge(value){
+ return Number(value)>0
+}
+
 </script>
 
 
@@ -558,6 +653,33 @@ function calcISDPercent(codigo){
 
 function calcISDValor(valor_total,percent){
  return round2(Number(valor_total)*(Number(percent)/100));
+}
+
+
+function editItem(id){
+ const row=document.querySelector('[data-id="'+id+'"]')
+ if(!row) return
+ row.contentEditable=true
+ const cell=row.querySelector(".actions")
+ cell.innerHTML=`
+   <button onclick="saveItem('${id}')">Guardar</button>
+   <button onclick="cancelEdit()">Cancelar</button>
+ `
+}
+
+function saveItem(id){
+ // placeholder save logic (actual supabase save exists elsewhere)
+ alert("Item guardado (demo).")
+ location.reload()
+}
+
+function cancelEdit(){
+ location.reload()
+}
+
+
+function visibleCharge(value){
+ return Number(value)>0
 }
 
 </script>
