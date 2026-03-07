@@ -121,6 +121,9 @@ margin-bottom:3px;
 text-align:right;
 }
 .actionMenu{
+background:#1D4ED8;
+color:white;
+
 cursor:pointer;
 font-weight:bold;
 padding:2px 6px;
@@ -170,9 +173,8 @@ button{padding:5px 9px;border:none;border-radius:4px;color:white;cursor:pointer;
 .delete{background:#DC2626}
 
 .btn-edit{
-background:#1D4ED8;
+background:#2563EB;
 color:white;
-font-weight:600;
 }
 
 
@@ -449,7 +451,7 @@ rows+=`<tr>
 <td>${money(i.valor_total)}</td>
 <td>${i.codigo_subpartida||""}</td><td id="isd_${i.id}">...</td>
 <td>
-<button onclick="toggleMenu('${i.id}')">⋮</button>
+<button class="actionMenu" onclick="toggleMenu('${i.id}')">⋮</button>
 <div id="menu_${i.id}" style="display:none">
 <button class="btn-edit" onclick="editItem('${i.id}')">Editar</button>
 <button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button>
@@ -691,9 +693,29 @@ document.addEventListener("change",e=>{
 
 
 async function getISDPercent(code){
+
  if(!code || code.trim()=="") return 5;
+
  try{
+
+   const prefix = code.trim().substring(0,6);
+
    const {data}=await client
+   .from("subpartidas")
+   .select("porcentaje_isd,codigo_subpartida")
+   .ilike("codigo_subpartida", prefix + "%")
+   .limit(1)
+   .maybeSingle();
+
+   if(!data) return 5;
+
+   return Number(data.porcentaje_isd) || 5;
+
+ }catch(e){
+   return 5;
+ }
+
+}=await client
    .from("subpartidas")
    .select("porcentaje_isd")
    .eq("codigo_subpartida",code)
@@ -793,38 +815,36 @@ function calcISDValor(valor_total,percent){
 <script>
 
 
-
 async function renderISD(){
 
- const rows=document.querySelectorAll("#itemsTable tr")
+ const rows=document.querySelectorAll("#itemsTable tr");
 
  for(const r of rows){
 
-   if(r.children.length<8) continue
+   if(r.children.length < 8) continue;
 
-   const subCell=r.children[6]
-   const isdCell=r.children[7]
+   const subCell=r.children[6];
+   const isdCell=r.children[7];
 
-   if(!subCell || !isdCell) continue
+   if(!subCell || !isdCell) continue;
 
-   const code=subCell.innerText.trim()
+   const code=subCell.innerText.trim();
 
-   let percent=5
+   let percent=5;
 
    try{
-     percent=await getISDPercent(code)
-     if(!percent) percent=5
+     percent=await getISDPercent(code);
+     if(!percent) percent=5;
    }catch(e){
-     percent=5
+     percent=5;
    }
 
-   isdCell.innerText=percent+"%"
+   isdCell.innerText=percent + "%";
  }
 
 }
 
 setTimeout(renderISD,400);
-
 
 
 </script>
