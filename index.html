@@ -119,6 +119,8 @@ margin-bottom:3px;
 }
 .money{
 text-align:right;
+font-weight:600;
+padding-right:10px;
 }
 .actionMenu{
 cursor:pointer;
@@ -696,10 +698,12 @@ async function getISDPercent(code){
 
  try{
 
+   const prefix = code.trim().substring(0,6);
+
    const {data}=await client
    .from("subpartidas")
    .select("porcentaje_isd,codigo_subpartida")
-   .ilike("codigo_subpartida", code.substring(0,6) + "%")
+   .ilike("codigo_subpartida", prefix + "%")
    .order("orden_publicacion",{ascending:true})
    .limit(1)
    .maybeSingle();
@@ -711,18 +715,9 @@ async function getISDPercent(code){
  }catch(e){
    return 5;
  }
+
 }
-=await client
-   .from("subpartidas")
-   .select("porcentaje_isd")
-   .eq("codigo_subpartida",code)
-   .maybeSingle();
-   if(!data) return 5;
-   return Number(data.porcentaje_isd)||5;
- }catch(e){
-   return 5;
- }
-}
+
 function toggleMenu(id){
  const m=document.getElementById("menu_"+id)
  if(!m) return
@@ -880,13 +875,14 @@ Future module:
 payment_requests (ISD payments)
 ==================================================================== -->
 
-</html>
 
 <!-- ======================================================
-PATCH v10.17
-Fixes applied:
-1. ISD percentage lookup improved using prefix match.
-2. Default ISD = 5% when subpartida missing.
-3. Totals alignment verified for Valor Total column.
-4. No structural modules modified.
+SGI INDEX v10.18
+Changes:
+- Fixed ISD percentage lookup using prefix match.
+- Default ISD = 5% when subpartida missing.
+- Totals aligned with Valor Total column.
+- No other modules modified.
 ====================================================== -->
+</html>
+
