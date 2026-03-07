@@ -121,9 +121,6 @@ margin-bottom:3px;
 text-align:right;
 }
 .actionMenu{
-background:#1D4ED8;
-color:white;
-font-weight:bold;
 cursor:pointer;
 font-weight:bold;
 padding:2px 6px;
@@ -557,26 +554,26 @@ contentArea.innerHTML+=`
 ${rows}
 
 <tr class="total">
-<td colspan="5">Subtotal items</td><td class="money">${money(subtotal)}</td><td></td><td></td><td></td>
+<td colspan="5">Subtotal items</td><td class="money">${money(subtotal)}</td><td colspan="3"></td>
 </tr>
 
 ${freight>0?`
 <tr>
-<td colspan="5">Freight</td><td class="money">${money(freight)}</td><td></td><td></td><td></td>
+<td colspan="5">Freight</td><td class="money">${money(freight)}</td><td colspan="3"></td>
 </tr>`:""}
 
 ${insurance>0?`
 <tr>
-<td colspan="5">Insurance</td><td class="money">${money(insurance)}</td><td></td><td></td><td></td>
+<td colspan="5">Insurance</td><td class="money">${money(insurance)}</td><td colspan="3"></td>
 </tr>`:""}
 
 ${others>0?`
 <tr>
-<td colspan="5">Others</td><td class="money">${money(others)}</td><td></td><td></td><td></td>
+<td colspan="5">Others</td><td class="money">${money(others)}</td><td colspan="3"></td>
 </tr>`:""}
 
 <tr class="total">
-<td colspan="5">TOTAL FACTURA</td><td class="money">${money(total)}</td><td></td><td></td><td></td>
+<td colspan="5">TOTAL FACTURA</td><td class="money">${money(total)}</td><td colspan="3"></td>
 </tr>
 
 </table>
@@ -597,14 +594,12 @@ freight:parseFloat(freight.value.replace(/,/g,""))||0,
 insurance:parseFloat(insurance.value.replace(/,/g,""))||0,
 others:parseFloat(others.value.replace(/,/g,""))||0
 }).eq("id",currentInvoice)
-openFactura(currentInvoice);
- setTimeout(renderISD,200)
+openFactura(currentInvoice)
 }
 
 async function deleteItem(id){
 await client.from("invoice_items").delete().eq("id",id)
-openFactura(currentInvoice);
- setTimeout(renderISD,200)
+openFactura(currentInvoice)
 }
 
 async function importExcel(){
@@ -634,8 +629,7 @@ codigo_subpartida:cols[6] ? cols[6].trim() : null
 if(rows.length==0){alert("No se detectaron filas");return}
 
 await client.from("invoice_items").insert(rows)
-openFactura(currentInvoice);
- setTimeout(renderISD,200)
+openFactura(currentInvoice)
 }
 
 async function loadSubpartidas(){
@@ -695,60 +689,20 @@ document.addEventListener("change",e=>{
 
 
 
-
 async function getISDPercent(code){
-
- if(!code || code.trim()==="") return 5
-
+ if(!code || code.trim()=="") return 5;
  try{
-
-   const {data,error}=await client
+   const {data}=await client
    .from("subpartidas")
    .select("porcentaje_isd")
-   .eq("codigo_subpartida",code.trim())
-   .maybeSingle()
-
-   if(error){
-      console.log(error)
-      return 5
-   }
-
-   if(!data) return 5
-
-   return Number(data.porcentaje_isd) || 5
-
+   .eq("codigo_subpartida",code)
+   .maybeSingle();
+   if(!data) return 5;
+   return Number(data.porcentaje_isd)||5;
  }catch(e){
-
-   console.log(e)
-   return 5
-
+   return 5;
  }
-
 }
-
-
-async function renderISD(){
-
- const rows=document.querySelectorAll("#itemsTable tr")
-
- for(const r of rows){
-
-   if(r.children.length < 8) continue
-
-   const subCell=r.children[6]
-   const isdCell=r.children[7]
-
-   if(!subCell || !isdCell) continue
-
-   const code=subCell.innerText.trim()
-
-   const percent=await getISDPercent(code)
-
-   isdCell.innerText=percent + "%"
- }
-
-}
-
 function toggleMenu(id){
  const m=document.getElementById("menu_"+id)
  if(!m) return
@@ -778,8 +732,7 @@ function editItem(id){
 
  cells[8].innerHTML=`
  <button class="btn-save" onclick="saveItem('${id}')">Guardar</button>
- <button class="btn-cancel" onclick="openFactura(currentInvoice);
- setTimeout(renderISD,200)">Cancelar</button>
+ <button class="btn-cancel" onclick="openFactura(currentInvoice)">Cancelar</button>
  `
 }
 
@@ -804,8 +757,7 @@ async function saveItem(id){
   codigo_subpartida:sub||null
  }).eq("id",id)
 
- openFactura(currentInvoice);
- setTimeout(renderISD,200)
+ openFactura(currentInvoice)
 }
 /* ===== END PATCH ===== */
 
@@ -863,6 +815,66 @@ setTimeout(async ()=>{
 
 },500);
 
+
+</script>
+
+
+<script>
+
+async function getISDPercentSafe(code){
+
+ if(!code || code.trim()===""){
+     return 5;
+ }
+
+ try{
+
+   const {data,error}=await client
+   .from("subpartidas")
+   .select("porcentaje_isd")
+   .eq("codigo_subpartida",code.trim())
+   .maybeSingle();
+
+   if(error || !data){
+       return 5;
+   }
+
+   const p = Number(data.porcentaje_isd);
+   if(!p) return 5;
+
+   return p;
+
+ }catch(e){
+   return 5;
+ }
+
+}
+
+
+async function renderISD(){
+
+ const rows=document.querySelectorAll("table tr");
+
+ for(const r of rows){
+
+   if(r.children.length < 8) continue;
+
+   const subCell=r.children[6];
+   const isdCell=r.children[7];
+
+   if(!subCell || !isdCell) continue;
+
+   const code=subCell.innerText.trim();
+
+   const percent = await getISDPercentSafe(code);
+
+   isdCell.innerText = percent + "%";
+
+ }
+
+}
+
+setTimeout(renderISD,500);
 
 </script>
 
