@@ -402,7 +402,19 @@ async function loadContractSelect(selected){
 
 async function openFactura(id){
 currentInvoice=id
-const {data:factura}=await client.from("invoices_px").select("*").eq("id",id).single()
+const {data:factura}=await client
+.from("invoices_px")
+.select(`
+ *,
+ contracts (
+   contract_number,
+   suppliers (
+     supplier_name
+   )
+ )
+`)
+.eq("id",id)
+.single()
 const {data:items}=await client.from("invoice_items").select("*").eq("invoice_id",id)
 
 let subtotal=0
@@ -437,7 +449,13 @@ let total=round2(subtotal+freight+insurance+others)
 contentArea.innerHTML=`
 <div class="card">
 
+
+<div style="font-size:13px;color:#374151;margin-bottom:4px;">
+Proveedor: <b>${factura.contracts?.suppliers?.supplier_name || "SIN PROVEEDOR"}</b>
+</div>
+
 <h3>Factura ${factura.invoice_number}</h3>
+
 
 <div class="header-grid">
 
