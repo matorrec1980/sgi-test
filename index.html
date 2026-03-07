@@ -119,8 +119,6 @@ margin-bottom:3px;
 }
 .money{
 text-align:right;
-font-weight:600;
-padding-right:10px;
 }
 .actionMenu{
 cursor:pointer;
@@ -172,8 +170,9 @@ button{padding:5px 9px;border:none;border-radius:4px;color:white;cursor:pointer;
 .delete{background:#DC2626}
 
 .btn-edit{
-background:#2563EB;
+background:#1D4ED8;
 color:white;
+font-weight:600;
 }
 
 
@@ -556,26 +555,26 @@ contentArea.innerHTML+=`
 ${rows}
 
 <tr class="total">
-<td colspan="5">Subtotal items</td><td class="money">${money(subtotal)}</td><td colspan="3"></td>
+<td colspan="5">Subtotal items</td><td class="money">${money(subtotal)}</td><td></td><td></td><td></td>
 </tr>
 
 ${freight>0?`
 <tr>
-<td colspan="5">Freight</td><td class="money">${money(freight)}</td><td colspan="3"></td>
+<td colspan="5">Freight</td><td class="money">${money(freight)}</td><td></td><td></td><td></td>
 </tr>`:""}
 
 ${insurance>0?`
 <tr>
-<td colspan="5">Insurance</td><td class="money">${money(insurance)}</td><td colspan="3"></td>
+<td colspan="5">Insurance</td><td class="money">${money(insurance)}</td><td></td><td></td><td></td>
 </tr>`:""}
 
 ${others>0?`
 <tr>
-<td colspan="5">Others</td><td class="money">${money(others)}</td><td colspan="3"></td>
+<td colspan="5">Others</td><td class="money">${money(others)}</td><td></td><td></td><td></td>
 </tr>`:""}
 
 <tr class="total">
-<td colspan="5">TOTAL FACTURA</td><td class="money">${money(total)}</td><td colspan="3"></td>
+<td colspan="5">TOTAL FACTURA</td><td class="money">${money(total)}</td><td></td><td></td><td></td>
 </tr>
 
 </table>
@@ -691,33 +690,20 @@ document.addEventListener("change",e=>{
 
 
 
-
 async function getISDPercent(code){
-
  if(!code || code.trim()=="") return 5;
-
  try{
-
-   const prefix = code.trim().substring(0,6);
-
    const {data}=await client
    .from("subpartidas")
-   .select("porcentaje_isd,codigo_subpartida")
-   .ilike("codigo_subpartida", prefix + "%")
-   .order("orden_publicacion",{ascending:true})
-   .limit(1)
+   .select("porcentaje_isd")
+   .eq("codigo_subpartida",code)
    .maybeSingle();
-
    if(!data) return 5;
-
-   return Number(data.porcentaje_isd) || 5;
-
+   return Number(data.porcentaje_isd)||5;
  }catch(e){
    return 5;
  }
-
 }
-
 function toggleMenu(id){
  const m=document.getElementById("menu_"+id)
  if(!m) return
@@ -807,13 +793,14 @@ function calcISDValor(valor_total,percent){
 <script>
 
 
-setTimeout(async ()=>{
+
+async function renderISD(){
 
  const rows=document.querySelectorAll("#itemsTable tr")
 
  for(const r of rows){
 
-   if(r.children.length < 8) continue
+   if(r.children.length<8) continue
 
    const subCell=r.children[6]
    const isdCell=r.children[7]
@@ -822,13 +809,22 @@ setTimeout(async ()=>{
 
    const code=subCell.innerText.trim()
 
-   let percent=await getISDPercent(code); if(!percent){percent=5;}
+   let percent=5
+
+   try{
+     percent=await getISDPercent(code)
+     if(!percent) percent=5
+   }catch(e){
+     percent=5
+   }
 
    isdCell.innerText=percent+"%"
-
  }
 
-},500);
+}
+
+setTimeout(renderISD,400);
+
 
 
 </script>
@@ -875,14 +871,4 @@ Future module:
 payment_requests (ISD payments)
 ==================================================================== -->
 
-
-<!-- ======================================================
-SGI INDEX v10.18
-Changes:
-- Fixed ISD percentage lookup using prefix match.
-- Default ISD = 5% when subpartida missing.
-- Totals aligned with Valor Total column.
-- No other modules modified.
-====================================================== -->
 </html>
-
