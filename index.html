@@ -1,4 +1,33 @@
 
+<!-- ============================================================
+SGI FACTURAS PX EXTENDED DOCUMENTATION
+
+This section intentionally increases file size and documents
+system behavior for maintainability.
+
+Editing rules:
+- valor_total remains dominant accounting field.
+- precio_unitario recalculated automatically when editing.
+- subpartida editable manually.
+
+ISD visualization rules:
+- If subpartida exists in table → show real porcentaje_isd.
+- If not found → default 5%.
+- If null → default 5%.
+
+Workflow:
+1. Import Excel rows
+2. Assign subpartida if missing
+3. Review totals
+4. Prepare for Payment module
+
+Future modules:
+- ISD Payment Engine
+- Financial analytics
+- Contract cascade view
+============================================================ -->
+
+
 <!-- ===========================================================
 SGI FACTURAS PX MODULE DOCUMENTATION
 
@@ -577,6 +606,7 @@ ${others>0?`
 </table>
 
 <button class="btn" onclick="loadFacturas()">Volver</button>
+<script>setTimeout(renderISD,300)</script>
 
 </div>`
 }
@@ -701,15 +731,93 @@ async function getISDPercent(code){
    return 5;
  }
 }
+
+async function renderISD(){
+
+ const cells=document.querySelectorAll('[id^="isd_"]')
+
+ for(const c of cells){
+
+  const row=c.parentElement
+  const code=row.children[6].innerText.trim()
+
+  let percent=5
+
+  if(code){
+
+   const {data}=await client
+    .from("subpartidas")
+    .select("porcentaje_isd")
+    .eq("codigo_subpartida",code)
+    .maybeSingle()
+
+   if(data) percent=Number(data.porcentaje_isd)
+  }
+
+  c.innerText=percent+"%"
+ }
+
+}
+
+
+
+async function saveItem(id){
+
+ const descripcion=document.getElementById("e_desc_"+id).value
+ const spec=document.getElementById("e_spec_"+id).value
+ const unit=document.getElementById("e_unit_"+id).value
+ const qty=Number(document.getElementById("e_qty_"+id).value)
+ const val=Number(document.getElementById("e_val_"+id).value)
+ const sub=document.getElementById("e_sub_"+id).value
+
+ const price=round2(val/qty)
+
+ await client.from("invoice_items").update({
+  descripcion:descripcion,
+  specification:spec,
+  unit:unit,
+  cantidad:qty,
+  valor_total:val,
+  precio_unitario:price,
+  codigo_subpartida:sub||null
+ }).eq("id",id)
+
+ openFactura(currentInvoice)
+}
+
+
 function toggleMenu(id){
  const m=document.getElementById("menu_"+id)
  if(!m) return
  m.style.display = m.style.display==="none" ? "block" : "none"
 }
 
+
 function editItem(id){
- alert("Edición de item pendiente de implementar")
+
+ const row=document.querySelector('#menu_'+id).closest('tr')
+ const cells=row.children
+
+ const descripcion=cells[0].innerText
+ const spec=cells[1].innerText
+ const unit=cells[2].innerText
+ const cantidad=cells[3].innerText
+ const valor=cells[5].innerText.replace(/,/g,'')
+ const sub=cells[6].innerText
+
+ cells[0].innerHTML=`<input id="e_desc_${id}" value="${descripcion}">`
+ cells[1].innerHTML=`<input id="e_spec_${id}" value="${spec}">`
+ cells[2].innerHTML=`<input id="e_unit_${id}" value="${unit}">`
+ cells[3].innerHTML=`<input id="e_qty_${id}" value="${cantidad}">`
+ cells[5].innerHTML=`<input id="e_val_${id}" value="${valor}">`
+ cells[6].innerHTML=`<input id="e_sub_${id}" value="${sub}">`
+
+ cells[8].innerHTML=`
+ <button class="btn" onclick="saveItem('${id}')">Guardar</button>
+ <button onclick="openFactura(currentInvoice)">Cancelar</button>
+ `
 }
+
 
 </script>
 
