@@ -1,4 +1,12 @@
 
+<!-- SGI FACTURAS PX ENGINEERING DOCUMENTATION
+valor_total = dominant accounting field
+precio_unitario = valor_total / cantidad
+ISD is not calculated here; only percentage displayed
+Actual ISD will be calculated in Payment module
+-->
+
+
 <!-- ============================================================
 SGI FACTURAS PX FINAL STRUCTURE
 
@@ -121,8 +129,8 @@ grid-template-columns:1fr 1fr;
 gap:12px;
 align-items:end;
 }
-.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+
+
 .total{font-weight:bold;background:#F3F4F6}
 .counter{margin:5px 0}
 
@@ -349,6 +357,7 @@ rows+=`<tr>
 <td>${money(i.precio_unitario)}</td>
 <td>${money(i.valor_total)}</td>
 <td>${i.codigo_subpartida||""}</td>
+<td id="isd_${i.id}">...</td>
 <td>
 <button onclick="toggleMenu('${i.id}')">⋮</button>
 <div id="menu_${i.id}" style="display:none">
@@ -444,6 +453,7 @@ contentArea.innerHTML+=`
 <th>Precio</th>
 <th>Valor Total</th>
 <th>Subpartida</th>
+<th>% ISD</th>
 <th></th>
 </tr>
 
@@ -488,6 +498,16 @@ ${others>0?`
 </tr>
 
 </table>
+<script>
+setTimeout(async ()=>{
+ const rows=document.querySelectorAll('[id^="isd_"]');
+ for(const r of rows){
+  const code=r.parentElement.children[6].innerText.trim();
+  const p=await getISDPercent(code);
+  r.innerText=p+"%";
+ }
+},100);
+</script>
 
 <button class="btn" onclick="loadFacturas()">Volver</button>
 
@@ -599,6 +619,17 @@ document.addEventListener("change",e=>{
 })
 
 
+
+async function getISDPercent(code){
+ if(!code || code.trim()=="") return 5;
+ const {data}=await client
+  .from("subpartidas")
+  .select("porcentaje_isd")
+  .eq("codigo_subpartida",code)
+  .maybeSingle();
+ if(!data) return 5;
+ return Number(data.porcentaje_isd)||5;
+}
 function toggleMenu(id){
  const m=document.getElementById("menu_"+id)
  if(!m) return
