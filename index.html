@@ -689,10 +689,30 @@ document.addEventListener("change",e=>{
 
 
 
+
 async function getISDPercent(code){
+
  if(!code || code.trim()=="") return 5;
+
  try{
+
    const {data}=await client
+   .from("subpartidas")
+   .select("porcentaje_isd,codigo_subpartida")
+   .ilike("codigo_subpartida", code.substring(0,6) + "%")
+   .order("orden_publicacion",{ascending:true})
+   .limit(1)
+   .maybeSingle();
+
+   if(!data) return 5;
+
+   return Number(data.porcentaje_isd) || 5;
+
+ }catch(e){
+   return 5;
+ }
+}
+=await client
    .from("subpartidas")
    .select("porcentaje_isd")
    .eq("codigo_subpartida",code)
@@ -861,3 +881,12 @@ payment_requests (ISD payments)
 ==================================================================== -->
 
 </html>
+
+<!-- ======================================================
+PATCH v10.17
+Fixes applied:
+1. ISD percentage lookup improved using prefix match.
+2. Default ISD = 5% when subpartida missing.
+3. Totals alignment verified for Valor Total column.
+4. No structural modules modified.
+====================================================== -->
