@@ -258,7 +258,14 @@ rows+=`<tr>
 <td>${i.cantidad}</td>
 <td>${money(i.precio_unitario)}</td>
 <td>${money(i.valor_total)}</td>
-<td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
+<td>${i.codigo_subpartida||""}</td>
+<td>
+<button onclick="toggleMenu('${i.id}')">⋮</button>
+<div id="menu_${i.id}" style="display:none">
+<button onclick="editItem('${i.id}')">Editar</button>
+<button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button>
+</div>
+</td>
 </tr>`
 })
 
@@ -306,25 +313,49 @@ contentArea.innerHTML+=`
 <table>
 <tr>
 <th>Descripción</th>
-<th>Spec</th>
-<th>Unit</th>
+<th>Especificación</th>
+<th>Unidad</th>
 <th>Cantidad</th>
 <th>Precio</th>
-<th>Total</th>
+<th>Valor Total</th>
+<th>Subpartida</th>
 <th></th>
 </tr>
 
 ${rows}
 
 <tr class="total">
-<td colspan="5">Subtotal</td>
+<td colspan="5">Subtotal items</td>
 <td>${money(subtotal)}</td>
+<td></td>
+<td></td>
+</tr>
+
+<tr>
+<td colspan="5">Freight</td>
+<td>${money(freight)}</td>
+<td></td>
+<td></td>
+</tr>
+
+<tr>
+<td colspan="5">Insurance</td>
+<td>${money(insurance)}</td>
+<td></td>
+<td></td>
+</tr>
+
+<tr>
+<td colspan="5">Others</td>
+<td>${money(others)}</td>
+<td></td>
 <td></td>
 </tr>
 
 <tr class="total">
-<td colspan="5">Total factura</td>
+<td colspan="5">TOTAL FACTURA</td>
 <td>${money(total)}</td>
+<td></td>
 <td></td>
 </tr>
 
@@ -437,6 +468,17 @@ document.addEventListener("change",e=>{
  const ids=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
  if(ids.includes(e.target.id)) saveFacturaHeader()
 })
+
+
+function toggleMenu(id){
+ const m=document.getElementById("menu_"+id)
+ if(!m) return
+ m.style.display = m.style.display==="none" ? "block" : "none"
+}
+
+function editItem(id){
+ alert("Edición de item pendiente de implementar")
+}
 
 </script>
 
