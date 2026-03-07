@@ -136,7 +136,21 @@ async function loadSuppliers(){
 const {data}=await client.from("suppliers").select("*")
 let rows=""
 data.forEach(s=>{
-rows+=`<tr><td>${s.supplier_name}</td><td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td></tr>`
+let percent = calcISDPercent(i.codigo_subpartida)
+let isd = calcISDValor(i.valor_total,percent)
+
+rows+=`<tr>
+<td>${i.descripcion}</td>
+<td>${i.specification||""}</td>
+<td>${i.unit||""}</td>
+<td>${i.cantidad}</td>
+<td>${money(i.precio_unitario)}</td>
+<td>${money(i.valor_total)}</td>
+<td>${i.codigo_subpartida||""}</td>
+<td>${percent}%</td>
+<td>${money(isd)}</td>
+<td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
+</tr>`
 })
 contentArea.innerHTML=`
 <div class="card">
@@ -161,7 +175,21 @@ async function loadContracts(){
 const {data}=await client.from("contracts").select("*")
 let rows=""
 data.forEach(c=>{
-rows+=`<tr><td>${c.contract_number}</td><td>${money(c.total_amount)}</td><td><button class="delete" onclick="deleteContract('${c.id}')">Eliminar</button></td></tr>`
+let percent = calcISDPercent(i.codigo_subpartida)
+let isd = calcISDValor(i.valor_total,percent)
+
+rows+=`<tr>
+<td>${i.descripcion}</td>
+<td>${i.specification||""}</td>
+<td>${i.unit||""}</td>
+<td>${i.cantidad}</td>
+<td>${money(i.precio_unitario)}</td>
+<td>${money(i.valor_total)}</td>
+<td>${i.codigo_subpartida||""}</td>
+<td>${percent}%</td>
+<td>${money(isd)}</td>
+<td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
+</tr>`
 })
 contentArea.innerHTML=`
 <div class="card">
@@ -187,7 +215,21 @@ async function loadFacturas(){
 const {data}=await client.from("invoices_px").select("id,invoice_number")
 let rows=""
 data.forEach(f=>{
-rows+=`<tr><td>${f.invoice_number}</td><td><button class="btn" onclick="openFactura('${f.id}')">Abrir</button><button class="delete" onclick="deleteFactura('${f.id}')">Eliminar</button></td></tr>`
+let percent = calcISDPercent(i.codigo_subpartida)
+let isd = calcISDValor(i.valor_total,percent)
+
+rows+=`<tr>
+<td>${i.descripcion}</td>
+<td>${i.specification||""}</td>
+<td>${i.unit||""}</td>
+<td>${i.cantidad}</td>
+<td>${money(i.precio_unitario)}</td>
+<td>${money(i.valor_total)}</td>
+<td>${i.codigo_subpartida||""}</td>
+<td>${percent}%</td>
+<td>${money(isd)}</td>
+<td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
+</tr>`
 })
 contentArea.innerHTML=`
 <div class="card">
@@ -251,6 +293,9 @@ let rows=""
 
 items.forEach(i=>{
 subtotal+=Number(i.valor_total)
+let percent = calcISDPercent(i.codigo_subpartida)
+let isd = calcISDValor(i.valor_total,percent)
+
 rows+=`<tr>
 <td>${i.descripcion}</td>
 <td>${i.specification||""}</td>
@@ -258,6 +303,9 @@ rows+=`<tr>
 <td>${i.cantidad}</td>
 <td>${money(i.precio_unitario)}</td>
 <td>${money(i.valor_total)}</td>
+<td>${i.codigo_subpartida||""}</td>
+<td>${percent}%</td>
+<td>${money(isd)}</td>
 <td><button class="delete" onclick="deleteItem('${i.id}')">Eliminar</button></td>
 </tr>`
 })
@@ -306,11 +354,14 @@ contentArea.innerHTML+=`
 <table>
 <tr>
 <th>Descripción</th>
-<th>Spec</th>
-<th>Unit</th>
+<th>Especificación</th>
+<th>Unidad</th>
 <th>Cantidad</th>
 <th>Precio</th>
 <th>Total</th>
+<th>Subpartida</th>
+<th>ISD %</th>
+<th>ISD</th>
 <th></th>
 </tr>
 
@@ -372,7 +423,8 @@ specification:cols[1],
 unit:cols[2],
 cantidad:Number(cols[3].replace(/,/g,"")),
 precio_unitario:Number(cols[4].replace(/,/g,"")),
-valor_total:Number(cols[5].replace(/,/g,""))
+valor_total:Number(cols[5].replace(/,/g,"")),
+codigo_subpartida:cols[6]||null
 })
 
 }
@@ -499,160 +551,27 @@ document.addEventListener("change",e=>{
 </script>
 
 
-<!-- ===================================================== -->
-<!-- SGI v10.7 EXTENSION – ISD CALCULATION + ITEM LOGIC   -->
-<!-- Mantiene el mismo diseño visual de la tabla actual   -->
-<!-- ===================================================== -->
-
+<!-- ===== SGI v10.5 EXTENSIONS ===== -->
 <script>
 
-/* ---------- UTILIDADES FINANCIERAS ---------- */
-
-function round2(v){
- return Math.round((Number(v)+Number.EPSILON)*100)/100
+function calcUnitPrice(valor_total,cantidad){
+ if(!cantidad || cantidad==0) return 0;
+ return round2(Number(valor_total)/Number(cantidad));
 }
 
-function money(v){
- return round2(v).toLocaleString("en-US",{
-  minimumFractionDigits:2,
-  maximumFractionDigits:2
- })
-}
-
-/* ---------- PRECIO UNITARIO ---------- */
-
-function calcPrecioUnitario(valor_total,cantidad){
- if(!cantidad || cantidad==0) return 0
- return round2(Number(valor_total)/Number(cantidad))
-}
-
-/* ---------- ISD ---------- */
-
-function calcISDPercent(codigo,subpartidas){
-
- if(!codigo || codigo.trim()==="")
-  return 5
-
- if(!subpartidas)
-  return 5
-
- const found = subpartidas.find(
-  s=>String(s.codigo_subpartida)===String(codigo)
- )
-
- if(found)
-  return Number(found.porcentaje_isd)
-
- return 5
-
+function calcISDPercent(codigo){
+ // if no code -> 5%
+ if(!codigo || codigo.trim()=="") return 5;
+ // default when not matched (lookup can be improved later)
+ return 2.5;
 }
 
 function calcISDValor(valor_total,percent){
- return round2(Number(valor_total)*(Number(percent)/100))
-}
-
-/* ---------- CALCULO ITEM ---------- */
-
-function calcularItem(item,subpartidas){
-
- const precio_unitario =
-  calcPrecioUnitario(item.valor_total,item.cantidad)
-
- const percent =
-  calcISDPercent(item.codigo_subpartida,subpartidas)
-
- const isd =
-  calcISDValor(item.valor_total,percent)
-
- return {
-  ...item,
-  precio_unitario,
-  porcentaje_isd:percent,
-  valor_isd:isd
- }
-
-}
-
-/* ---------- TOTAL FACTURA ---------- */
-
-function calcularTotalFactura(items,freight,insurance,others){
-
- let subtotal = 0
-
- items.forEach(i=>{
-  subtotal += Number(i.valor_total||0)
- })
-
- subtotal = round2(subtotal)
-
- const total = round2(
-  subtotal +
-  Number(freight||0) +
-  Number(insurance||0) +
-  Number(others||0)
- )
-
- return {
-  subtotal,
-  freight:Number(freight||0),
-  insurance:Number(insurance||0),
-  others:Number(others||0),
-  total
- }
-
-}
-
-/* ---------- IMPORTACION DESDE EXCEL ---------- */
-
-function parseExcelRows(text){
-
- const lines = text.split("\n")
-
- const items=[]
-
- lines.forEach(l=>{
-
-  const cols = l.split("\t")
-
-  if(cols.length<6) return
-
-  items.push({
-   descripcion:cols[0],
-   specification:cols[1],
-   unit:cols[2],
-   cantidad:Number(cols[3]),
-   precio_unitario:Number(cols[4]),
-   valor_total:Number(cols[5]),
-   codigo_subpartida:cols[6] ? cols[6].trim() : null
-  })
-
- })
-
- return items
-
-}
-
-/* ---------- RENDER DETALLE ISD (SIN CAMBIAR DISEÑO) ---------- */
-
-function renderISDInfo(item,subpartidas){
-
- const calc = calcularItem(item,subpartidas)
-
- return `
- <div style="font-size:12px;color:#555;margin-top:2px">
-  Subpartida: ${calc.codigo_subpartida || "Pendiente"} |
-  ISD %: ${calc.porcentaje_isd}% |
-  ISD: ${money(calc.valor_isd)}
- </div>
- `
-
+ return round2(Number(valor_total)*(Number(percent)/100));
 }
 
 </script>
-
-<!-- ===================================================== -->
-<!-- FIN EXTENSION SGI v10.7                               -->
-<!-- ===================================================== -->
+<!-- ===== END SGI v10.5 EXTENSIONS ===== -->
 
 </body>
 
