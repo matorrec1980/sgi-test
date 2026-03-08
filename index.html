@@ -131,7 +131,7 @@ border-radius:4px;
 <meta charset="UTF-8">
 <title>SGI - Sistema de Gestión de Importaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+<script>
 // ---- PATCH v10.3 header autosave ----
 async function saveFacturaHeader(){
  if(!currentInvoice) return
@@ -153,6 +153,8 @@ document.addEventListener("change",e=>{
 
 </script>
 
+
+</script>
 <style>
 body{margin:0;font-family:Arial;background:#F5F6F8}
 .layout{display:none;height:100vh}
@@ -261,8 +263,7 @@ color:#374151;
 
 const SUPABASE_URL="https://rnoprngmmqvrzfygyppg.supabase.co"
 const SUPABASE_KEY="sb_publishable_zLWA_SDD0Y6Jt3ADtdmwZg_M95oKx8W"
-const { createClient } = supabase
-const client = createClient(SUPABASE_URL, SUPABASE_KEY)
+const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY)
 
 let currentInvoice=null
 let page=0
@@ -272,8 +273,8 @@ function round2(v){return Math.round((Number(v)+Number.EPSILON)*100)/100}
 function money(v){return round2(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
 
 document.addEventListener("DOMContentLoaded",async()=>{
-const { data: { session } } = await client.auth.getSession()
-if(session){
+const {data}=await client.auth.getSession()
+if(data.session){
 loginContainer.style.display="none"
 appLayout.style.display="flex"
 userInfo.innerText=data.session.user.email
@@ -296,8 +297,7 @@ async function loadDashboard(){
 const {data}=await client.from("subpartidas").select("porcentaje_isd")
 let c0=0
 let c25=0
-if(!data) return
- data.forEach(s=>{
+data.forEach(s=>{
 if(Number(s.porcentaje_isd)==0)c0++
 if(Number(s.porcentaje_isd)==2.5)c25++
 })
@@ -313,8 +313,7 @@ contentArea.innerHTML=`
 async function loadSuppliers(){
 const {data}=await client.from("suppliers").select("*")
 let rows=""
-if(!data) return
- data.forEach(s=>{
+data.forEach(s=>{
 rows+=`<tr><td>${s.supplier_name}</td><td><button class="delete" onclick="deleteSupplier('${s.id}')">Eliminar</button></td></tr>`
 })
 contentArea.innerHTML=`
@@ -332,7 +331,6 @@ loadSuppliers()
 }
 
 async function deleteSupplier(id){
-if(!confirm("¿Está seguro que desea eliminar el proveedor?")) return
 await client.from("suppliers").delete().eq("id",id)
 loadSuppliers()
 }
@@ -649,8 +647,7 @@ let totalPages=Math.ceil(count/pageSize)
 
 let rows=""
 
-if(!data) return
- data.forEach(s=>{
+data.forEach(s=>{
 rows+=`<tr><td>${s.codigo_subpartida}</td><td>${s.descripcion}</td><td>${s.porcentaje_isd}</td></tr>`
 })
 
@@ -673,256 +670,3 @@ function prevPage(){if(page>0)page--;loadSubpartidas()}
 
 
 
-// ---- PATCH v10.3 header autosave ----
-async function saveFacturaHeader(){
- if(!currentInvoice) return
- const f={}
- const map=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
- map.forEach(id=>{
-   const el=document.getElementById(id)
-   if(el) f[id]=el.value
- })
- try{
-   await client.from("invoices_px").update(f).eq("id",currentInvoice.id)
- }catch(e){console.log(e)}
-}
-
-document.addEventListener("change",e=>{
- const ids=["fecha_factura","invoice_number","contract_id","bl_number","fecha_embarque","freight","insurance","others"]
- if(ids.includes(e.target.id)) saveFacturaHeader()
-})
-
-
-
-async function getISDPercent(code){
- if(!code || code.trim()=="") return 5;
- try{
-   const {data}=await client
-   .from("subpartidas")
-   .select("porcentaje_isd")
-   .eq("codigo_subpartida",code)
-   .maybeSingle();
-   if(!data) return 5;
-   return Number(data.porcentaje_isd)||5;
- }catch(e){
-   return 5;
- }
-}
-function toggleMenu(id){
- const m=document.getElementById("menu_"+id)
- if(!m) return
- m.style.display = m.style.display==="none" ? "block" : "none"
-}
-
-
-/* ===== PATCH v10.12 EDIT ITEMS ===== */
-function editItem(id){
-
- const row=document.querySelector("#menu_"+id).closest("tr")
- const cells=row.children
-
- const descripcion=cells[0].innerText
- const spec=cells[1].innerText
- const unit=cells[2].innerText
- const cantidad=cells[3].innerText
- const valor=cells[5].innerText.replace(/,/g,"")
- const sub=cells[6].innerText
-
- cells[0].innerHTML=`<input id="e_desc_${id}" value="${descripcion}">`
- cells[1].innerHTML=`<input id="e_spec_${id}" value="${spec}">`
- cells[2].innerHTML=`<input id="e_unit_${id}" value="${unit}">`
- cells[3].innerHTML=`<input id="e_qty_${id}" value="${cantidad}">`
- cells[5].innerHTML=`<input id="e_val_${id}" value="${valor}">`
- cells[6].innerHTML=`<input id="e_sub_${id}" value="${sub}">`
-
- cells[8].innerHTML=`
- <button class="btn-save" onclick="saveItem('${id}')">Guardar</button>
- <button class="btn-cancel" onclick="openFactura(currentInvoice)">Cancelar</button>
- `
-}
-
-async function saveItem(id){
-
- const descripcion=document.getElementById("e_desc_"+id).value
- const spec=document.getElementById("e_spec_"+id).value
- const unit=document.getElementById("e_unit_"+id).value
- const qty=Number(document.getElementById("e_qty_"+id).value)
- const val=Number(document.getElementById("e_val_"+id).value)
- const sub=document.getElementById("e_sub_"+id).value
-
- const price=round2(val/qty)
-
- await client.from("invoice_items").update({
-  descripcion:descripcion,
-  specification:spec,
-  unit:unit,
-  cantidad:qty,
-  valor_total:val,
-  precio_unitario:price,
-  codigo_subpartida:sub||null
- }).eq("id",id)
-
- openFactura(currentInvoice)
-}
-/* ===== END PATCH ===== */
-
-
-</script>
-
-
-<!-- UTILITIES CLEANED (duplicate block removed) -->
-<!-- ===== SGI v10.5 EXTENSIONS ===== -->
-<script>
-
-function calcUnitPrice(valor_total,cantidad){
- if(!cantidad || cantidad==0) return 0;
- return round2(Number(valor_total)/Number(cantidad));
-}
-
-function calcISDPercent(codigo){
- // if no code -> 5%
- if(!codigo || codigo.trim()=="") return 5;
- // default when not matched (lookup can be improved later)
- return 2.5;
-}
-
-function calcISDValor(valor_total,percent){
- return round2(Number(valor_total)*(Number(percent)/100));
-}
-
-</script>
-<!-- ===== END SGI v10.5 EXTENSIONS ===== -->
-
-
-<script>
-
-
-setTimeout(async ()=>{
-
- const rows=document.querySelectorAll("#itemsTable tr")
-
- for(const r of rows){
-
-   if(r.children.length < 8) continue
-
-   const subCell=r.children[6]
-   const isdCell=r.children[7]
-
-   if(!subCell || !isdCell) continue
-
-   const code=subCell.innerText.trim()
-
-   let percent=await getISDPercent(code); if(!percent){percent=5;}
-
-   isdCell.innerText=percent+"%"
-
- }
-
-},500);
-
-
-</script>
-
-
-<script>
-
-async function getISDPercentSafe(code){
-
- if(!code || code.trim()===""){
-     return 5;
- }
-
- try{
-
-   const {data,error}=await client
-   .from("subpartidas")
-   .select("porcentaje_isd")
-   .eq("codigo_subpartida",code.trim())
-   .maybeSingle();
-
-   if(error || !data){
-       return 5;
-   }
-
-   const p = Number(data.porcentaje_isd);
-   if(!p) return 5;
-
-   return p;
-
- }catch(e){
-   return 5;
- }
-
-}
-
-
-async function renderISD(){
-
- const rows=document.querySelectorAll("table tr");
-
- for(const r of rows){
-
-   if(r.children.length < 8) continue;
-
-   const subCell=r.children[6];
-   const isdCell=r.children[7];
-
-   if(!subCell || !isdCell) continue;
-
-   const code=subCell.innerText.trim();
-
-   const percent = await getISDPercentSafe(code);
-
-   isdCell.innerText = percent + "%";
-
- }
-
-}
-
-setTimeout(renderISD,500);
-
-</script>
-
-</body>
-
-<!-- ===================== SGI SYSTEM DOCUMENTATION =====================
-This section documents system rules directly inside the index file to
-ensure maintainability and prevent loss of architectural knowledge.
-
-Architecture:
-Frontend HTML + Supabase JS
-Backend Supabase API
-Database PostgreSQL with Row Level Security.
-
-Core modules:
-Dashboard
-Suppliers
-Contracts / PO
-Invoices PX
-Invoice Items
-Subpartidas ISD
-
-Financial rule:
-valor_total is the dominant field.
-precio_unitario = valor_total / cantidad
-
-ISD formula:
-ISD = valor_total * porcentaje_isd
-
-Invoice total:
-subtotal items + freight + insurance + others
-
-Excel import columns:
-descripcion
-specification
-unit
-cantidad
-precio_unitario
-valor_total
-subpartida
-
-Future module:
-payment_requests (ISD payments)
-==================================================================== -->
-
-</html>
