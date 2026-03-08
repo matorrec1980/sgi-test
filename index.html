@@ -272,16 +272,30 @@ const pageSize=50
 function round2(v){return Math.round((Number(v)+Number.EPSILON)*100)/100}
 function money(v){return round2(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
 
-document.addEventListener("DOMContentLoaded",async()=>{
-const {data}=await client.auth.getSession()
-if(data.session){
-loginContainer.style.display="none"
-appLayout.style.display="flex"
-userInfo.innerText=data.session.user.email
-loadDashboard()
-}
-})
 
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    const res = await client.auth.getSession();
+    const session = res && res.data && res.data.session ? res.data.session : null;
+    // get elements by id to be robust
+    const loginContainer = document.getElementById('loginContainer');
+    const appLayout = document.getElementById('appLayout');
+    const userInfo = document.getElementById('userInfo');
+    const contentArea = document.getElementById('contentArea');
+    if (session) {
+      if (loginContainer) loginContainer.style.display = "none";
+      if (appLayout) appLayout.style.display = "block";
+      if (userInfo) userInfo.innerText = session.user.email || '';
+      await loadDashboard();
+    } else {
+      // make sure layout hidden and login shown
+      if (loginContainer) loginContainer.style.display = "block";
+      if (appLayout) appLayout.style.display = "none";
+    }
+  } catch (e) {
+    console.error('Error on DOMContentLoaded auth', e);
+  }
+});
 async function login(){
 const {error}=await client.auth.signInWithPassword({email:email.value,password:password.value})
 if(error){loginMessage.innerText=error.message;return}
